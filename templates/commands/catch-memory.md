@@ -4,14 +4,14 @@ argument-hint: [会话文件路径] (可选，默认为当前会话)
 allowed-tools: Read, Write, Bash, Glob
 ---
 
-# Catch Memories（捕获记忆）
+# Catch Memory（捕获记忆）
 
 从 Claude Code 会话记录中提取结构化、可查询的记忆。捕获决策、洞察、模式、纠正和可学习信息，供跨会话调用。
 
 ## 用法
 
 ```bash
-/catch-memories [会话文件路径]
+/catch-memory [会话文件路径]
 ```
 
 **参数：**
@@ -285,7 +285,7 @@ allowed-tools: Read, Write, Bash, Glob
 ### 示例 1：分析当前会话
 
 ```bash
-/catch-memories
+/catch-memory
 ```
 
 **输出：**
@@ -304,7 +304,7 @@ allowed-tools: Read, Write, Bash, Glob
 ### 示例 2：分析特定会话
 
 ```bash
-/catch-memories /Users/wangxingwen/.claude/sessions/2025-01-14/10-15-00-email-triage.json
+/catch-memory /Users/wangxingwen/.claude/sessions/2025-01-14/10-15-00-email-triage.json
 ```
 
 **输出：**

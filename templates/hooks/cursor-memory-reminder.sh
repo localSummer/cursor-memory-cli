@@ -55,7 +55,7 @@ EVALUATION PROTOCOL (NON-NEGOTIABLE):
 
 3. IF YES to any question above:
    ACTIVATE: Use Skill(cursor-memory) NOW to extract memories
-   The skill will call /catch-memories to capture structured observations
+   The skill will call /catch-memory to capture structured observations
 
 4. IF NO to all questions:
    SKIP: No memory extraction needed

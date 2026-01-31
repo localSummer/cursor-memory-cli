@@ -94,7 +94,7 @@ node ~/.cursor/cli/cursor-memory-cli/index.mjs setup --global
          - hooks.json (merged)
          - hooks/cursor-memory-reminder.sh (executable)
          - skills/cursor-memory/ (SKILL.md, README.md)
-         - commands/catch-memories.md
+         - commands/catch-memory.md
 ```
 
 ### 2. 重启 Cursor
@@ -106,7 +106,7 @@ node ~/.cursor/cli/cursor-memory-cli/index.mjs setup --global
 现在每次与 Cursor Agent 交互时，系统会自动评估是否需要提取记忆。你也可以手动触发：
 
 ```
-/catch-memories
+/catch-memory
 ```
 
 ## 安装组件说明
@@ -148,9 +148,9 @@ CLI 会安装以下组件：
 - `references/TYPES.md`：10 种记忆类型和 12 种实体类型的定义
 - `references/STORAGE.md`：存储格式和去重逻辑说明
 
-### 4. catch-memories 命令
+### 4. catch-memory 命令
 
-位于 `commands/catch-memories.md`，提供手动触发记忆提取的能力。
+位于 `commands/catch-memory.md`，提供手动触发记忆提取的能力。
 
 ## 使用方法
 
@@ -169,7 +169,7 @@ CLI 会安装以下组件：
 在 Cursor 中使用命令：
 
 ```
-/catch-memories
+/catch-memory
 ```
 
 分析当前会话并提取记忆。
@@ -177,7 +177,7 @@ CLI 会安装以下组件：
 分析特定会话文件：
 
 ```
-/catch-memories /path/to/session-file.json
+/catch-memory /path/to/session-file.json
 ```
 
 ### 显式请求
@@ -376,7 +376,7 @@ cursor-memory-cli/
     │           ├── TYPES.md
     │           └── STORAGE.md
     └── commands/
-        └── catch-memories.md   # 命令定义
+        └── catch-memory.md   # 命令定义
 ```
 
 ## License

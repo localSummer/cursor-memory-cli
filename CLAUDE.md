@@ -28,7 +28,7 @@ cursor-memory-cli/
     ├── hooks.json
     ├── hooks/cursor-memory-reminder.sh
     ├── skills/cursor-memory/
-    └── commands/catch-memories.md
+    └── commands/catch-memory.md
 ```
 
 ## 开发规范
@@ -78,7 +78,7 @@ node index.mjs --help
 1. **合并 hooks.json** - 读取现有配置，添加 cursor-memory hook
 2. **安装 hook 脚本** - 复制 `cursor-memory-reminder.sh` 并设置执行权限
 3. **安装 skill** - 复制 `skills/cursor-memory/` 目录
-4. **安装命令** - 复制 `commands/catch-memories.md`
+4. **安装命令** - 复制 `commands/catch-memory.md`
 
 ## 扩展指南
 
