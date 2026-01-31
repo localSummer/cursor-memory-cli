@@ -19,9 +19,14 @@
 Cursor Memory 系统通过以下机制工作：
 
 1. **Hook 触发**：在每次提交 prompt 前，自动触发记忆评估提醒
-2. **智能分析**：评估当前会话是否产生了值得保留的记忆
+2. **Skill 自主执行**：cursor-memory skill 独立完成记忆分析、提取和存储
 3. **结构化提取**：提取决策、洞察、模式、纠正等多种类型的记忆
 4. **持久化存储**：将记忆保存为结构化 JSON 文件，便于后续查询
+
+### Skill 与 Command 的关系
+
+- **cursor-memory skill**：核心组件，自主完成记忆的分析、提取和存储，无需调用外部命令
+- **catch-memory command**：手动补充工具，供用户在需要时显式触发记忆提取
 
 ### 核心特性
 
@@ -103,7 +108,9 @@ node ~/.cursor/cli/cursor-memory-cli/index.mjs setup --global
 
 ### 3. 开始使用
 
-现在每次与 Cursor Agent 交互时，系统会自动评估是否需要提取记忆。你也可以手动触发：
+现在每次与 Cursor Agent 交互时，系统会自动评估是否需要提取记忆。cursor-memory skill 会自主完成记忆的分析、提取和存储。
+
+如果需要手动触发记忆提取，可以使用命令：
 
 ```
 /catch-memory
@@ -148,15 +155,17 @@ CLI 会安装以下组件：
 - `references/TYPES.md`：10 种记忆类型和 12 种实体类型的定义
 - `references/STORAGE.md`：存储格式和去重逻辑说明
 
-### 4. catch-memory 命令
+### 4. catch-memory 命令（手动补充）
 
-位于 `commands/catch-memory.md`，提供手动触发记忆提取的能力。
+位于 `commands/catch-memory.md`，作为手动触发记忆提取的补充工具。
+
+**注意**：cursor-memory skill 已具备独立完成记忆提取的能力，此命令主要用于用户需要显式控制时使用。
 
 ## 使用方法
 
-### 自动模式
+### 自动模式（推荐）
 
-安装完成后，Cursor Memory 会在以下情况自动评估并提取记忆：
+安装完成后，cursor-memory skill 会在以下情况自动评估并提取记忆：
 
 - 解决了复杂的调试问题
 - 通过试错找到了可行的解决方案
@@ -164,9 +173,11 @@ CLI 会安装以下组件：
 - 做出了重要的架构或技术决策
 - 发现了跨会话相关的洞察
 
-### 手动触发
+Skill 会自主完成记忆的分析、提取和存储到 `./memories/` 目录，无需用户干预。
 
-在 Cursor 中使用命令：
+### 手动触发（补充方式）
+
+当需要显式控制记忆提取时，可以在 Cursor 中使用命令：
 
 ```
 /catch-memory
@@ -179,6 +190,12 @@ CLI 会安装以下组件：
 ```
 /catch-memory /path/to/session-file.json
 ```
+
+**适用场景**：
+
+- 希望立即提取记忆而不等待自动评估
+- 需要分析历史会话文件
+- 调试记忆提取功能
 
 ### 显式请求
 
