@@ -1,5 +1,7 @@
 # cursor-memory-cli
 
+![Cursor Memory Banner](./assets/banner.png)
+
 一个用于安装和配置 Cursor Memory 系统的命令行工具。Cursor Memory 是一个持续学习系统，可以从 Cursor 会话中提取结构化记忆，并将其编码为可查询的 JSON 记录，供跨会话调用。
 
 ## 目录
