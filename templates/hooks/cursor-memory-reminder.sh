@@ -55,7 +55,11 @@ EVALUATION PROTOCOL (NON-NEGOTIABLE):
 
 3. IF YES to any question above:
    ACTIVATE: Use Skill(cursor-memory) NOW to extract memories
-   The skill will call /catch-memory to capture structured observations
+   The skill will autonomously analyze the session, extract structured
+   observations, and save them to ./memories/ directory.
+
+   NOTE: The /catch-memory command is available for manual invocation
+   if you prefer explicit control over memory extraction.
 
 4. IF NO to all questions:
    SKIP: No memory extraction needed
