@@ -1,25 +1,25 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
 const DEFAULT_CONFIG = {
   retention_days: 60,
-  expiry_basis: 'last_updated',
-  archive_dir: './memories/archive',
+  expiry_basis: "last_updated",
+  archive_dir: "./memories/archive",
   aggregate: {
-    granularity: 'month',
-    schema: 'sessions+deduped_index',
+    granularity: "month",
+    schema: "sessions+deduped_index",
     dedupe: {
-      method: 'jaccard',
+      method: "jaccard",
       threshold: 0.85,
-      fields: ['content']
-    }
+      fields: ["content"],
+    },
   },
   processing_limit: 200,
-  log_file: './memories/archive.log',
-  quarantine_dir: './memories/.quarantine',
-  lock_file: './memories/.archive.lock',
-  remove_empty_dirs: true
+  log_file: "./memories/archive.log",
+  quarantine_dir: "./memories/.quarantine",
+  lock_file: "./memories/.archive.lock",
+  remove_empty_dirs: true,
 };
 
 function parseArgs(argv) {
@@ -29,27 +29,27 @@ function parseArgs(argv) {
     cursorDir: null,
     dryRun: false,
     thresholdOverride: null,
-    limitOverride: null
+    limitOverride: null,
   };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === '--project-root') {
+    if (arg === "--project-root") {
       result.projectRoot = args[i + 1] || result.projectRoot;
       i += 1;
-    } else if (arg === '--cursor-dir') {
+    } else if (arg === "--cursor-dir") {
       result.cursorDir = args[i + 1] || result.cursorDir;
       i += 1;
-    } else if (arg === '--dry-run') {
+    } else if (arg === "--dry-run") {
       result.dryRun = true;
-    } else if (arg === '--threshold') {
+    } else if (arg === "--threshold") {
       const value = args[i + 1];
-      if (value && !value.startsWith('--')) {
+      if (value && !value.startsWith("--")) {
         result.thresholdOverride = Number(value);
         i += 1;
       }
-    } else if (arg === '--limit') {
+    } else if (arg === "--limit") {
       const value = args[i + 1];
-      if (value && !value.startsWith('--')) {
+      if (value && !value.startsWith("--")) {
         result.limitOverride = Number(value);
         i += 1;
       }
@@ -59,17 +59,17 @@ function parseArgs(argv) {
 }
 
 function readJsonFile(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf-8');
+  const raw = fs.readFileSync(filePath, "utf-8");
   return JSON.parse(raw);
 }
 
 function readConfig(projectRoot, cursorDir) {
   const candidates = [];
   if (cursorDir) {
-    candidates.push(path.join(cursorDir, 'memory-archive.json'));
+    candidates.push(path.join(cursorDir, "memory-archive.json"));
   }
-  candidates.push(path.join(projectRoot, '.cursor', 'memory-archive.json'));
-  candidates.push(path.join(os.homedir(), '.cursor', 'memory-archive.json'));
+  candidates.push(path.join(projectRoot, ".cursor", "memory-archive.json"));
+  candidates.push(path.join(os.homedir(), ".cursor", "memory-archive.json"));
 
   for (const filePath of candidates) {
     if (fs.existsSync(filePath)) {
@@ -97,7 +97,11 @@ function appendLog(logFile, message) {
   if (!logFile) return;
   try {
     ensureDir(path.dirname(logFile));
-    fs.appendFileSync(logFile, `${new Date().toISOString()} ${message}\n`, 'utf-8');
+    fs.appendFileSync(
+      logFile,
+      `${new Date().toISOString()} ${message}\n`,
+      "utf-8",
+    );
   } catch {
     // ignore
   }
@@ -107,12 +111,12 @@ function acquireLock(lockFile) {
   if (!lockFile) return { locked: true, release: () => {} };
   try {
     ensureDir(path.dirname(lockFile));
-    const fd = fs.openSync(lockFile, 'wx');
+    const fd = fs.openSync(lockFile, "wx");
     const payload = JSON.stringify({
       pid: process.pid,
-      started_at: new Date().toISOString()
+      started_at: new Date().toISOString(),
     });
-    fs.writeFileSync(fd, payload, 'utf-8');
+    fs.writeFileSync(fd, payload, "utf-8");
     const release = () => {
       try {
         fs.closeSync(fd);
@@ -143,10 +147,10 @@ function listSessionFiles(memoriesDir, excludeDirNames) {
     const files = fs.readdirSync(dirPath, { withFileTypes: true });
     for (const file of files) {
       if (!file.isFile()) continue;
-      if (!file.name.endsWith('.json')) continue;
+      if (!file.name.endsWith(".json")) continue;
       results.push({
         filePath: path.join(dirPath, file.name),
-        dateDir
+        dateDir,
       });
     }
   }
@@ -154,7 +158,7 @@ function listSessionFiles(memoriesDir, excludeDirNames) {
 }
 
 function parseDate(value) {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== "string") return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d;
@@ -162,9 +166,9 @@ function parseDate(value) {
 
 function getBasisDate(data, basis, filePath) {
   let date = null;
-  if (basis === 'last_updated') {
+  if (basis === "last_updated") {
     date = parseDate(data.last_updated) || parseDate(data.timestamp);
-  } else if (basis === 'timestamp') {
+  } else if (basis === "timestamp") {
     date = parseDate(data.timestamp) || parseDate(data.last_updated);
   }
   if (!date) {
@@ -207,20 +211,27 @@ function uniqueDestPath(destPath) {
 
 function getMonthKey(date) {
   const year = String(date.getUTCFullYear());
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
 }
 
+function getDatePrefix(date) {
+  const year = String(date.getUTCFullYear());
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function parseDateFromDir(dateDir) {
-  if (typeof dateDir !== 'string') return null;
+  if (typeof dateDir !== "string") return null;
   const d = new Date(`${dateDir}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }
 
 function tokenize(text) {
-  if (typeof text !== 'string') return new Set();
-  const normalized = text.normalize('NFKC').toLowerCase();
+  if (typeof text !== "string") return new Set();
+  const normalized = text.normalize("NFKC").toLowerCase();
   const tokens = normalized.match(/\p{L}+/gu) || [];
   return new Set(tokens.filter(Boolean));
 }
@@ -240,13 +251,13 @@ function dedupeMemories(sessions, dedupeConfig) {
   const byKey = new Map();
 
   for (const session of sessions) {
-    const sessionId = session.session_id || 'unknown-session';
+    const sessionId = session.session_id || "unknown-session";
     const memories = Array.isArray(session.memories) ? session.memories : [];
     for (const mem of memories) {
-      const type = mem.type || 'unknown';
-      const title = mem.title || 'untitled';
+      const type = mem.type || "unknown";
+      const title = mem.title || "untitled";
       const key = `${type}||${title}`;
-      const content = mem.content || '';
+      const content = mem.content || "";
       const tokens = tokenize(content);
       const bucket = byKey.get(key) || [];
 
@@ -267,7 +278,8 @@ function dedupeMemories(sessions, dedupeConfig) {
         }
         if ((mem.confidence_score || 0) > (existing.confidence_score || 0)) {
           existing.content = content;
-          existing.confidence_score = mem.confidence_score || existing.confidence_score;
+          existing.confidence_score =
+            mem.confidence_score || existing.confidence_score;
           existing.category = mem.category || existing.category;
         }
       } else {
@@ -279,8 +291,8 @@ function dedupeMemories(sessions, dedupeConfig) {
             title,
             content,
             confidence_score: mem.confidence_score || 0,
-            source_session_ids: [sessionId]
-          }
+            source_session_ids: [sessionId],
+          },
         });
       }
 
@@ -308,8 +320,8 @@ function loadAggregate(aggregatePath, monthKey, retentionDays) {
       stats: {
         session_count: 0,
         memory_count: 0,
-        deduped_count: 0
-      }
+        deduped_count: 0,
+      },
     };
   }
   try {
@@ -324,8 +336,8 @@ function loadAggregate(aggregatePath, monthKey, retentionDays) {
       stats: {
         session_count: 0,
         memory_count: 0,
-        deduped_count: 0
-      }
+        deduped_count: 0,
+      },
     };
   }
 }
@@ -359,7 +371,7 @@ function updateAggregate(aggregate, newSessions, dedupeConfig, retentionDays) {
   aggregate.stats = {
     session_count: mergedSessions.length,
     memory_count: memoryCount,
-    deduped_count: deduped.length
+    deduped_count: deduped.length,
   };
 
   return aggregate;
@@ -368,7 +380,7 @@ function updateAggregate(aggregate, newSessions, dedupeConfig, retentionDays) {
 function writeJsonAtomic(filePath, data) {
   ensureDir(path.dirname(filePath));
   const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
   fs.renameSync(tempPath, filePath);
 }
 
@@ -387,16 +399,16 @@ function getExcludeDirNames(memoriesDir, archiveDir, quarantineDir) {
   const exclude = new Set();
   const archiveRel = path.relative(memoriesDir, archiveDir);
   const quarantineRel = path.relative(memoriesDir, quarantineDir);
-  if (!archiveRel.startsWith('..')) {
+  if (!archiveRel.startsWith("..")) {
     const name = archiveRel.split(path.sep)[0];
     if (name) exclude.add(name);
   }
-  if (!quarantineRel.startsWith('..')) {
+  if (!quarantineRel.startsWith("..")) {
     const name = quarantineRel.split(path.sep)[0];
     if (name) exclude.add(name);
   }
-  exclude.add('archive');
-  exclude.add('.quarantine');
+  exclude.add("archive");
+  exclude.add(".quarantine");
   return exclude;
 }
 
@@ -408,34 +420,40 @@ function main() {
   const retentionDays = Number(
     Number.isFinite(thresholdOverride)
       ? thresholdOverride
-      : config.retention_days || DEFAULT_CONFIG.retention_days
+      : config.retention_days || DEFAULT_CONFIG.retention_days,
   );
   const expiryBasis = config.expiry_basis || DEFAULT_CONFIG.expiry_basis;
   const processingLimit = Number(
     Number.isFinite(limitOverride)
       ? limitOverride
-      : config.processing_limit || DEFAULT_CONFIG.processing_limit
+      : config.processing_limit || DEFAULT_CONFIG.processing_limit,
   );
   const removeEmptyDirs =
-    typeof config.remove_empty_dirs === 'boolean'
+    typeof config.remove_empty_dirs === "boolean"
       ? config.remove_empty_dirs
       : DEFAULT_CONFIG.remove_empty_dirs;
 
-  const memoriesDir = path.resolve(projectRoot, 'memories');
+  const memoriesDir = path.resolve(projectRoot, "memories");
   if (!fs.existsSync(memoriesDir)) return;
 
   const archiveDir = resolveMaybeRelative(projectRoot, config.archive_dir);
-  const aggregateDir = path.join(archiveDir, 'aggregate');
-  const logFile = resolveMaybeRelative(projectRoot, config.log_file || DEFAULT_CONFIG.log_file);
+  const aggregateDir = path.join(archiveDir, "aggregate");
+  const logFile = resolveMaybeRelative(
+    projectRoot,
+    config.log_file || DEFAULT_CONFIG.log_file,
+  );
   const quarantineDir = resolveMaybeRelative(
     projectRoot,
-    config.quarantine_dir || DEFAULT_CONFIG.quarantine_dir
+    config.quarantine_dir || DEFAULT_CONFIG.quarantine_dir,
   );
-  const lockFile = resolveMaybeRelative(projectRoot, config.lock_file || DEFAULT_CONFIG.lock_file);
+  const lockFile = resolveMaybeRelative(
+    projectRoot,
+    config.lock_file || DEFAULT_CONFIG.lock_file,
+  );
 
   const lock = acquireLock(lockFile);
   if (!lock.locked) {
-    appendLog(logFile, 'archive skipped: lock held');
+    appendLog(logFile, "archive skipped: lock held");
     return;
   }
 
@@ -443,7 +461,11 @@ function main() {
     const now = new Date();
     const candidates = [];
     const touchedDirs = new Set();
-    const excludeDirs = getExcludeDirNames(memoriesDir, archiveDir, quarantineDir);
+    const excludeDirs = getExcludeDirNames(
+      memoriesDir,
+      archiveDir,
+      quarantineDir,
+    );
 
     for (const entry of listSessionFiles(memoriesDir, excludeDirs)) {
       let data;
@@ -453,7 +475,7 @@ function main() {
         appendLog(logFile, `quarantine parse error: ${entry.filePath}`);
         if (!dryRun) {
           const destPath = uniqueDestPath(
-            path.join(quarantineDir, path.basename(entry.filePath))
+            path.join(quarantineDir, path.basename(entry.filePath)),
           );
           moveFile(entry.filePath, destPath);
           touchedDirs.add(path.join(memoriesDir, entry.dateDir));
@@ -466,7 +488,7 @@ function main() {
           filePath: entry.filePath,
           dateDir: entry.dateDir,
           data,
-          basisDate
+          basisDate,
         });
       }
     }
@@ -475,20 +497,13 @@ function main() {
     const limit = processingLimit > 0 ? processingLimit : candidates.length;
     const toArchive = candidates.slice(0, limit);
     if (toArchive.length === 0) {
-      appendLog(logFile, 'archive skipped: no expired sessions');
+      appendLog(logFile, "archive skipped: no expired sessions");
       return;
     }
 
     const sessionsByMonth = new Map();
 
     for (const item of toArchive) {
-      if (!dryRun) {
-        const destDir = path.join(archiveDir, item.dateDir);
-        const destPath = uniqueDestPath(path.join(destDir, path.basename(item.filePath)));
-        moveFile(item.filePath, destPath);
-        touchedDirs.add(path.join(memoriesDir, item.dateDir));
-      }
-
       const session = item.data;
       const sessionDate =
         parseDate(session?.timestamp) ||
@@ -497,6 +512,17 @@ function main() {
         item.basisDate ||
         now;
       const monthKey = getMonthKey(sessionDate);
+
+      if (!dryRun) {
+        const destDir = path.join(archiveDir, monthKey);
+        const datePrefix = getDatePrefix(sessionDate);
+        const originalName = path.basename(item.filePath);
+        const newFileName = `${datePrefix}-${originalName}`;
+        const destPath = uniqueDestPath(path.join(destDir, newFileName));
+        moveFile(item.filePath, destPath);
+        touchedDirs.add(path.join(memoriesDir, item.dateDir));
+      }
+
       if (!sessionsByMonth.has(monthKey)) {
         sessionsByMonth.set(monthKey, []);
       }
@@ -510,7 +536,7 @@ function main() {
         aggregate,
         sessions,
         config.aggregate?.dedupe,
-        retentionDays
+        retentionDays,
       );
       if (!dryRun) {
         writeJsonAtomic(aggregatePath, updated);
@@ -524,8 +550,8 @@ function main() {
     appendLog(
       logFile,
       `archived ${toArchive.length} session(s) across ${sessionsByMonth.size} month(s)${
-        dryRun ? ' (dry-run)' : ''
-      }`
+        dryRun ? " (dry-run)" : ""
+      }`,
     );
     if (!dryRun) {
       // keep stdout minimal for CLI use
