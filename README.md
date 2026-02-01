@@ -192,7 +192,11 @@ CLI 会安装以下组件：
       "fields": ["content"]
     }
   },
-  "processing_limit": 200
+  "processing_limit": 200,
+  "log_file": "./memories/archive.log",
+  "quarantine_dir": "./memories/.quarantine",
+  "lock_file": "./memories/.archive.lock",
+  "remove_empty_dirs": true
 }
 ```
 
@@ -237,6 +241,20 @@ Skill 会自主完成记忆的分析、提取和存储到 `./memories/` 目录�
 - 希望立即提取记忆而不等待自动评估
 - 需要分析历史会话文件
 - 调试记忆提取功能
+
+### 归档（手动触发）
+
+如果需要手动执行归档（例如调试或预览），可以运行：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs archive --global
+```
+
+预览模式（不移动文件）：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs archive --global --dry-run
+```
 
 ### 显式请求
 
@@ -369,6 +387,10 @@ Cursor Memory 支持 10 种记忆类型：
 - `expiry_basis`：过期检测字段（`last_updated` / `timestamp`）
 - `archive_dir`：归档目录
 - `processing_limit`：每次 sessionEnd 处理的最大文件数
+- `log_file`：归档日志路径
+- `quarantine_dir`：损坏文件隔离目录
+- `lock_file`：并发锁文件路径
+- `remove_empty_dirs`：是否清理空日期目录
 
 ### 调整记忆提取行为
 
@@ -395,6 +417,10 @@ A: 记忆存储在当前工作目录的 `./memories/` 目录下，按日期组�
 
 A: 归档文件存储在 `./memories/archive/` 目录下，聚合文件位于 `./memories/archive/aggregate/`。
 
+### Q: JSON 解析失败的文件会怎样？
+
+A: 会被移动到 `./memories/.quarantine/`，同时记录在 `./memories/archive.log` 中。
+
 ### Q: 如何查看提取的记忆？
 
 A: 直接查看 `./memories/YYYY-MM-DD/` 目录下的 JSON 文件。
@@ -417,15 +443,19 @@ A: 重新运行安装命令即可，CLI 会智能合并配置而不会丢失现�
 ## 命令参考
 
 ```
-Usage: node cli/cursor-memory-cli/index.mjs setup [--global|--local]
+Usage: node cli/cursor-memory-cli/index.mjs <command> [options]
 
 Commands:
-  setup    Install cursor-memory components
+  setup     Install cursor-memory components
+  archive   Run memory archive manually
 
 Options:
-  --global   Install to ~/.cursor/ (user-level)
-  --local    Install to ./.cursor/ (project-level)
-  --help     Show help message
+  --global    Install to ~/.cursor/ (user-level)
+  --local     Install to ./.cursor/ (project-level)
+  --dry-run   Preview archive without moving files (archive command)
+  --threshold <days>  Override retention days (archive command)
+  --limit <n>  Override max files per run (archive command)
+  --help      Show help message
 ```
 
 ## 技术架构

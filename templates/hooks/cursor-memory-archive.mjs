@@ -15,12 +15,22 @@ const DEFAULT_CONFIG = {
       fields: ['content']
     }
   },
-  processing_limit: 200
+  processing_limit: 200,
+  log_file: './memories/archive.log',
+  quarantine_dir: './memories/.quarantine',
+  lock_file: './memories/.archive.lock',
+  remove_empty_dirs: true
 };
 
 function parseArgs(argv) {
   const args = argv.slice(2);
-  const result = { projectRoot: process.cwd(), cursorDir: null };
+  const result = {
+    projectRoot: process.cwd(),
+    cursorDir: null,
+    dryRun: false,
+    thresholdOverride: null,
+    limitOverride: null
+  };
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
     if (arg === '--project-root') {
@@ -29,6 +39,20 @@ function parseArgs(argv) {
     } else if (arg === '--cursor-dir') {
       result.cursorDir = args[i + 1] || result.cursorDir;
       i += 1;
+    } else if (arg === '--dry-run') {
+      result.dryRun = true;
+    } else if (arg === '--threshold') {
+      const value = args[i + 1];
+      if (value && !value.startsWith('--')) {
+        result.thresholdOverride = Number(value);
+        i += 1;
+      }
+    } else if (arg === '--limit') {
+      const value = args[i + 1];
+      if (value && !value.startsWith('--')) {
+        result.limitOverride = Number(value);
+        i += 1;
+      }
     }
   }
   return result;
@@ -65,13 +89,55 @@ function resolveMaybeRelative(baseDir, targetPath) {
   return path.resolve(baseDir, targetPath);
 }
 
-function listSessionFiles(memoriesDir) {
+function ensureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function appendLog(logFile, message) {
+  if (!logFile) return;
+  try {
+    ensureDir(path.dirname(logFile));
+    fs.appendFileSync(logFile, `${new Date().toISOString()} ${message}\n`, 'utf-8');
+  } catch {
+    // ignore
+  }
+}
+
+function acquireLock(lockFile) {
+  if (!lockFile) return { locked: true, release: () => {} };
+  try {
+    ensureDir(path.dirname(lockFile));
+    const fd = fs.openSync(lockFile, 'wx');
+    const payload = JSON.stringify({
+      pid: process.pid,
+      started_at: new Date().toISOString()
+    });
+    fs.writeFileSync(fd, payload, 'utf-8');
+    const release = () => {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // ignore
+      }
+      try {
+        fs.unlinkSync(lockFile);
+      } catch {
+        // ignore
+      }
+    };
+    return { locked: true, release };
+  } catch {
+    return { locked: false, release: () => {} };
+  }
+}
+
+function listSessionFiles(memoriesDir, excludeDirNames) {
   if (!fs.existsSync(memoriesDir)) return [];
   const entries = fs.readdirSync(memoriesDir, { withFileTypes: true });
   const results = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (entry.name === 'archive') continue;
+    if (excludeDirNames.has(entry.name)) continue;
     const dateDir = entry.name;
     const dirPath = path.join(memoriesDir, dateDir);
     const files = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -112,10 +178,6 @@ function isExpired(date, retentionDays, now) {
   if (!date) return false;
   const diff = now.getTime() - date.getTime();
   return diff > retentionDays * 24 * 60 * 60 * 1000;
-}
-
-function ensureDir(dirPath) {
-  fs.mkdirSync(dirPath, { recursive: true });
 }
 
 function moveFile(src, dest) {
@@ -303,77 +365,176 @@ function updateAggregate(aggregate, newSessions, dedupeConfig, retentionDays) {
   return aggregate;
 }
 
-function writeJson(filePath, data) {
+function writeJsonAtomic(filePath, data) {
   ensureDir(path.dirname(filePath));
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  const tempPath = `${filePath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tempPath, filePath);
+}
+
+function cleanupEmptyDirs(dirPaths) {
+  for (const dirPath of dirPaths) {
+    try {
+      const entries = fs.readdirSync(dirPath);
+      if (entries.length === 0) fs.rmdirSync(dirPath);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function getExcludeDirNames(memoriesDir, archiveDir, quarantineDir) {
+  const exclude = new Set();
+  const archiveRel = path.relative(memoriesDir, archiveDir);
+  const quarantineRel = path.relative(memoriesDir, quarantineDir);
+  if (!archiveRel.startsWith('..')) {
+    const name = archiveRel.split(path.sep)[0];
+    if (name) exclude.add(name);
+  }
+  if (!quarantineRel.startsWith('..')) {
+    const name = quarantineRel.split(path.sep)[0];
+    if (name) exclude.add(name);
+  }
+  exclude.add('archive');
+  exclude.add('.quarantine');
+  return exclude;
 }
 
 function main() {
-  const { projectRoot, cursorDir } = parseArgs(process.argv);
+  const { projectRoot, cursorDir, dryRun, thresholdOverride, limitOverride } =
+    parseArgs(process.argv);
   const { config } = readConfig(projectRoot, cursorDir);
 
-  const retentionDays = Number(config.retention_days || DEFAULT_CONFIG.retention_days);
+  const retentionDays = Number(
+    Number.isFinite(thresholdOverride)
+      ? thresholdOverride
+      : config.retention_days || DEFAULT_CONFIG.retention_days
+  );
   const expiryBasis = config.expiry_basis || DEFAULT_CONFIG.expiry_basis;
   const processingLimit = Number(
-    config.processing_limit || DEFAULT_CONFIG.processing_limit
+    Number.isFinite(limitOverride)
+      ? limitOverride
+      : config.processing_limit || DEFAULT_CONFIG.processing_limit
   );
+  const removeEmptyDirs =
+    typeof config.remove_empty_dirs === 'boolean'
+      ? config.remove_empty_dirs
+      : DEFAULT_CONFIG.remove_empty_dirs;
 
   const memoriesDir = path.resolve(projectRoot, 'memories');
   if (!fs.existsSync(memoriesDir)) return;
 
   const archiveDir = resolveMaybeRelative(projectRoot, config.archive_dir);
   const aggregateDir = path.join(archiveDir, 'aggregate');
+  const logFile = resolveMaybeRelative(projectRoot, config.log_file || DEFAULT_CONFIG.log_file);
+  const quarantineDir = resolveMaybeRelative(
+    projectRoot,
+    config.quarantine_dir || DEFAULT_CONFIG.quarantine_dir
+  );
+  const lockFile = resolveMaybeRelative(projectRoot, config.lock_file || DEFAULT_CONFIG.lock_file);
 
-  const now = new Date();
-  const candidates = [];
-  for (const entry of listSessionFiles(memoriesDir)) {
-    let data;
-    try {
-      data = readJsonFile(entry.filePath);
-    } catch {
-      continue;
-    }
-    const basisDate = getBasisDate(data, expiryBasis, entry.filePath);
-    if (isExpired(basisDate, retentionDays, now)) {
-      candidates.push({
-        filePath: entry.filePath,
-        dateDir: entry.dateDir,
-        data,
-        basisDate
-      });
-    }
+  const lock = acquireLock(lockFile);
+  if (!lock.locked) {
+    appendLog(logFile, 'archive skipped: lock held');
+    return;
   }
 
-  candidates.sort((a, b) => a.basisDate.getTime() - b.basisDate.getTime());
-  const limit = processingLimit > 0 ? processingLimit : candidates.length;
-  const toArchive = candidates.slice(0, limit);
-  if (toArchive.length === 0) return;
+  try {
+    const now = new Date();
+    const candidates = [];
+    const touchedDirs = new Set();
+    const excludeDirs = getExcludeDirNames(memoriesDir, archiveDir, quarantineDir);
 
-  const sessionsByMonth = new Map();
-
-  for (const item of toArchive) {
-    const destDir = path.join(archiveDir, item.dateDir);
-    const destPath = uniqueDestPath(path.join(destDir, path.basename(item.filePath)));
-    moveFile(item.filePath, destPath);
-
-    const session = item.data;
-    const sessionDate =
-      parseDate(session?.timestamp) ||
-      parseDate(session?.last_updated) ||
-      parseDateFromDir(item.dateDir) ||
-      item.basisDate;
-    const monthKey = getMonthKey(sessionDate);
-    if (!sessionsByMonth.has(monthKey)) {
-      sessionsByMonth.set(monthKey, []);
+    for (const entry of listSessionFiles(memoriesDir, excludeDirs)) {
+      let data;
+      try {
+        data = readJsonFile(entry.filePath);
+      } catch {
+        appendLog(logFile, `quarantine parse error: ${entry.filePath}`);
+        if (!dryRun) {
+          const destPath = uniqueDestPath(
+            path.join(quarantineDir, path.basename(entry.filePath))
+          );
+          moveFile(entry.filePath, destPath);
+          touchedDirs.add(path.join(memoriesDir, entry.dateDir));
+        }
+        continue;
+      }
+      const basisDate = getBasisDate(data, expiryBasis, entry.filePath);
+      if (isExpired(basisDate, retentionDays, now)) {
+        candidates.push({
+          filePath: entry.filePath,
+          dateDir: entry.dateDir,
+          data,
+          basisDate
+        });
+      }
     }
-    sessionsByMonth.get(monthKey).push(session);
-  }
 
-  for (const [monthKey, sessions] of sessionsByMonth.entries()) {
-    const aggregatePath = path.join(aggregateDir, `${monthKey}.json`);
-    const aggregate = loadAggregate(aggregatePath, monthKey, retentionDays);
-    const updated = updateAggregate(aggregate, sessions, config.aggregate?.dedupe, retentionDays);
-    writeJson(aggregatePath, updated);
+    candidates.sort((a, b) => a.basisDate.getTime() - b.basisDate.getTime());
+    const limit = processingLimit > 0 ? processingLimit : candidates.length;
+    const toArchive = candidates.slice(0, limit);
+    if (toArchive.length === 0) {
+      appendLog(logFile, 'archive skipped: no expired sessions');
+      return;
+    }
+
+    const sessionsByMonth = new Map();
+
+    for (const item of toArchive) {
+      if (!dryRun) {
+        const destDir = path.join(archiveDir, item.dateDir);
+        const destPath = uniqueDestPath(path.join(destDir, path.basename(item.filePath)));
+        moveFile(item.filePath, destPath);
+        touchedDirs.add(path.join(memoriesDir, item.dateDir));
+      }
+
+      const session = item.data;
+      const sessionDate =
+        parseDate(session?.timestamp) ||
+        parseDate(session?.last_updated) ||
+        parseDateFromDir(item.dateDir) ||
+        item.basisDate ||
+        now;
+      const monthKey = getMonthKey(sessionDate);
+      if (!sessionsByMonth.has(monthKey)) {
+        sessionsByMonth.set(monthKey, []);
+      }
+      sessionsByMonth.get(monthKey).push(session);
+    }
+
+    for (const [monthKey, sessions] of sessionsByMonth.entries()) {
+      const aggregatePath = path.join(aggregateDir, `${monthKey}.json`);
+      const aggregate = loadAggregate(aggregatePath, monthKey, retentionDays);
+      const updated = updateAggregate(
+        aggregate,
+        sessions,
+        config.aggregate?.dedupe,
+        retentionDays
+      );
+      if (!dryRun) {
+        writeJsonAtomic(aggregatePath, updated);
+      }
+    }
+
+    if (!dryRun && removeEmptyDirs) {
+      cleanupEmptyDirs(touchedDirs);
+    }
+
+    appendLog(
+      logFile,
+      `archived ${toArchive.length} session(s) across ${sessionsByMonth.size} month(s)${
+        dryRun ? ' (dry-run)' : ''
+      }`
+    );
+    if (!dryRun) {
+      // keep stdout minimal for CLI use
+      console.log(`Archived ${toArchive.length} session(s).`);
+    } else {
+      console.log(`Dry-run: ${toArchive.length} session(s) would be archived.`);
+    }
+  } finally {
+    lock.release();
   }
 }
 

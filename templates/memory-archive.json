@@ -11,5 +11,9 @@
       "fields": ["content"]
     }
   },
-  "processing_limit": 200
+  "processing_limit": 200,
+  "log_file": "./memories/archive.log",
+  "quarantine_dir": "./memories/.quarantine",
+  "lock_file": "./memories/.archive.lock",
+  "remove_empty_dirs": true
 }
