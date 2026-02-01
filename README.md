@@ -100,6 +100,9 @@ node ~/.cursor/cli/cursor-memory-cli/index.mjs setup --global
        Components installed:
          - hooks.json (merged)
          - hooks/cursor-memory-reminder.sh (executable)
+         - hooks/cursor-memory-archive.sh (executable)
+         - hooks/cursor-memory-archive.mjs
+         - memory-archive.json
          - skills/cursor-memory/ (SKILL.md, README.md)
          - commands/catch-memory.md
 ```
@@ -134,6 +137,11 @@ CLI 会安装以下组件：
       {
         "command": "~/.cursor/hooks/cursor-memory-reminder.sh"
       }
+    ],
+    "sessionEnd": [
+      {
+        "command": "~/.cursor/hooks/cursor-memory-archive.sh"
+      }
     ]
   }
 }
@@ -149,7 +157,16 @@ CLI 会安装以下组件：
 - 创建临时规则文件 `rules/cursor-memory-reminder.mdc`
 - 提示 Agent 评估当前会话是否产生了值得保留的记忆
 
-### 3. cursor-memory skill
+### 3. cursor-memory-archive.sh / cursor-memory-archive.mjs
+
+位于 `hooks/` 目录的归档脚本与执行器，负责：
+
+- 在 `sessionEnd` 时扫描 `./memories/` 中过期文件
+- 将过期会话移动到 `./memories/archive/`
+- 按月生成聚合文件 `./memories/archive/aggregate/YYYY-MM.json`
+- 跨会话相似度去重（Jaccard > 0.85）
+
+### 4. cursor-memory skill
 
 位于 `skills/cursor-memory/` 目录，包含：
 
@@ -157,7 +174,29 @@ CLI 会安装以下组件：
 - `references/TYPES.md`：10 种记忆类型和 12 种实体类型的定义
 - `references/STORAGE.md`：存储格式和去重逻辑说明
 
-### 4. catch-memory 命令（手动补充）
+### 5. memory-archive.json
+
+归档配置文件，默认内容如下：
+
+```json
+{
+  "retention_days": 60,
+  "expiry_basis": "last_updated",
+  "archive_dir": "./memories/archive",
+  "aggregate": {
+    "granularity": "month",
+    "schema": "sessions+deduped_index",
+    "dedupe": {
+      "method": "jaccard",
+      "threshold": 0.85,
+      "fields": ["content"]
+    }
+  },
+  "processing_limit": 200
+}
+```
+
+### 6. catch-memory 命令（手动补充）
 
 位于 `commands/catch-memory.md`，作为手动触发记忆提取的补充工具。
 
@@ -312,10 +351,24 @@ Cursor Memory 支持 10 种记忆类型：
       {
         "command": "其他 hook 命令"
       }
+    ],
+    "sessionEnd": [
+      {
+        "command": "~/.cursor/hooks/cursor-memory-archive.sh"
+      }
     ]
   }
 }
 ```
+
+### 归档配置（memory-archive.json）
+
+可在 `memory-archive.json` 中调整：
+
+- `retention_days`：过期天数阈值
+- `expiry_basis`：过期检测字段（`last_updated` / `timestamp`）
+- `archive_dir`：归档目录
+- `processing_limit`：每次 sessionEnd 处理的最大文件数
 
 ### 调整记忆提取行为
 
@@ -338,6 +391,9 @@ A: 请确保：
 ### Q: 记忆文件存储在哪里？
 
 A: 记忆存储在当前工作目录的 `./memories/` 目录下，按日期组织。
+### Q: 归档文件存储在哪里？
+
+A: 归档文件存储在 `./memories/archive/` 目录下，聚合文件位于 `./memories/archive/aggregate/`。
 
 ### Q: 如何查看提取的记忆？
 
@@ -386,8 +442,11 @@ cursor-memory-cli/
 │   └── ui.mjs          # 交互式 UI
 └── templates/
     ├── hooks.json              # hooks 配置模板
+    ├── memory-archive.json     # 归档配置模板
     ├── hooks/
-    │   └── cursor-memory-reminder.sh  # hook 脚本
+    │   ├── cursor-memory-reminder.sh  # hook 脚本
+    │   ├── cursor-memory-archive.sh   # 归档 hook
+    │   └── cursor-memory-archive.mjs  # 归档执行器
     ├── skills/
     │   └── cursor-memory/      # 技能定义
     │       ├── SKILL.md

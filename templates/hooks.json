@@ -5,6 +5,11 @@
       {
         "command": "~/.cursor/hooks/cursor-memory-reminder.sh"
       }
+    ],
+    "sessionEnd": [
+      {
+        "command": "~/.cursor/hooks/cursor-memory-archive.sh"
+      }
     ]
   }
 }

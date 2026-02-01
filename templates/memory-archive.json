@@ -1,0 +1,15 @@
+{
+  "retention_days": 60,
+  "expiry_basis": "last_updated",
+  "archive_dir": "./memories/archive",
+  "aggregate": {
+    "granularity": "month",
+    "schema": "sessions+deduped_index",
+    "dedupe": {
+      "method": "jaccard",
+      "threshold": 0.85,
+      "fields": ["content"]
+    }
+  },
+  "processing_limit": 200
+}
