@@ -2,6 +2,7 @@
 
 # Cursor Memory Archive Hook
 # Runs on session end to archive or merge expired memories.
+# # 这些变量的值取决于**脚本文件本身的位置**,而不是执行脚本时的当前工作目录。`${BASH_SOURCE[0]}` 始终指向脚本文件的实际路径,所以无论你在哪个目录执行这个脚本,这三个变量的值都是固定的。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$SCRIPT_DIR"
