@@ -413,6 +413,7 @@ A: 请确保：
 ### Q: 记忆文件存储在哪里？
 
 A: 记忆存储在当前工作目录的 `./memories/` 目录下，按日期组织。
+
 ### Q: 归档文件存储在哪里？
 
 A: 归档文件存储在 `./memories/archive/` 目录下，聚合文件位于 `./memories/archive/aggregate/`。
