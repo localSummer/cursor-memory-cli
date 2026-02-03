@@ -39,11 +39,13 @@
 ### 架构特点
 
 **优势**
+
 - 纯 Node 内置模块，安装成本低
 - hooks 合并具备幂等性
 - 归档执行器具备去重、锁机制、隔离区、聚合统计
 
 **潜在问题**
+
 - 缺少测试与验证（无单测/集成测试）
 - 配置与兼容性检查不足，错误定位困难
 - 可观测性弱，缺少结构化诊断信息
@@ -96,6 +98,7 @@ flowchart TD
 ```
 
 **模块结构规划（在现有 lib 基础上扩展）**
+
 - `lib/commands/`：命令入口（doctor/search/migrate/analytics/privacy/semantic）
 - `lib/core/`：配置、存储、索引、保留策略、schema
 - `lib/diagnostics/`：健康检查规则、报告与修复器
@@ -124,15 +127,18 @@ export async function runCommand(ctx, args) {
 #### 1. Memory Doctor（健康检查）
 
 **解决的痛点**
+
 - 安装或运行失败时难以定位问题
 - 用户无法自助诊断配置错误
 
 **技术架构设计**
+
 - 诊断引擎：统一执行 `checks` 注册表
 - 检查类型：配置合法性、权限、路径、运行时环境、版本兼容
 - 报告器：支持文本与 JSON 输出；可选 `--fix` 触发修复器
 
 **模块结构（规划）**
+
 - `lib/commands/doctor.mjs`
 - `lib/diagnostics/checks/*.mjs`
 - `lib/diagnostics/report.mjs`
@@ -140,8 +146,15 @@ export async function runCommand(ctx, args) {
 - `lib/diagnostics/fixers/*.mjs`
 
 **接口设计（示例）**
+
 ```js
-export async function runDoctor({ targetDir, format = "text", fix = false, strict = false, logger }) {
+export async function runDoctor({
+  targetDir,
+  format = "text",
+  fix = false,
+  strict = false,
+  logger,
+}) {
   const issues = await runChecks({ targetDir, logger });
   return formatReport(issues, { format, strict });
 }
@@ -152,24 +165,29 @@ export function createCheck({ id, level, run }) {
 ```
 
 **技术选型权衡**
+
 - 自研诊断引擎 vs 引入依赖：零依赖优先，但需清晰可扩展的 check 规范
 - 文本输出 vs JSON 输出：CLI 友好与可脚本化并存，建议默认文本，提供 `--json`
 
 **CLI 交互流程（文字流程）**
+
 1. 用户运行 `cursor-memory doctor --json`
 2. CLI 解析参数，定位 `targetDir`
 3. 执行诊断检查并收集 `issues`
 4. 输出报告；如有 fatal 级问题返回非 0 退出码
 
 **测试策略与质量**
+
 - 单元测试：每个 check 的边界输入与错误处理
 - 集成测试：构建临时 `.cursor` fixture（缺失 hooks.json / 权限不足等）
 
 **性能基准与可观测性**
+
 - 基准：常规项目 < 300ms 完成诊断
 - 指标：`doctor.checks.total`、`doctor.issues.error`、`doctor.duration_ms`
 
 **风险与技术债**
+
 - false positive 导致误导用户，需允许 `--ignore <checkId>` 白名单
 
 ---
@@ -177,15 +195,18 @@ export function createCheck({ id, level, run }) {
 #### 2. Memory Search（本地检索）
 
 **解决的痛点**
+
 - 记忆无法快速查找和复用
 - 只能手动翻阅 JSON 文件
 
 **技术架构设计**
+
 - 数据源：`memories/archive` 与聚合 `deduped_index`
 - 索引策略：默认全量扫描 + 可选倒排索引缓存（增量更新）
 - 输出层：JSON / Table
 
 **模块结构（规划）**
+
 - `lib/commands/search.mjs`
 - `lib/search/index.mjs`
 - `lib/search/query.mjs`
@@ -193,30 +214,43 @@ export function createCheck({ id, level, run }) {
 - `lib/storage/memories.mjs`
 
 **接口设计（示例）**
+
 ```js
-export function searchMemories({ keyword, since, type, limit, fields, cursor }) {
+export function searchMemories({
+  keyword,
+  since,
+  type,
+  limit,
+  fields,
+  cursor,
+}) {
   // 读索引或全量扫描 -> 过滤 -> 排序 -> 返回结果
 }
 ```
 
 **技术选型权衡**
+
 - 全量扫描：实现简单，性能有限（小规模 OK）
 - 倒排索引：构建成本高，但查询快；可通过 `--reindex` 触发更新
 
 **CLI 交互流程（文字流程）**
+
 1. 解析参数 `--since/--type/--keyword/--limit`
 2. 判断是否存在索引
 3. 查询并输出（`--format table|json`）
 
 **测试策略与质量**
+
 - 单元测试：查询解析、过滤逻辑
 - 集成测试：构建 1k/10k fixture 校验性能与排序稳定性
 
 **性能基准与可观测性**
+
 - 基准：10k 记录 < 200ms，索引构建 < 2s
 - 指标：`search.index.hit`、`search.result.count`、`search.duration_ms`
 
 **风险与技术债**
+
 - 索引陈旧导致结果错误，需要 `--reindex` 与自动过期策略
 
 ---
@@ -226,21 +260,25 @@ export function searchMemories({ keyword, since, type, limit, fields, cursor }) 
 #### 3. Schema Validator & Migrator（格式验证与迁移）
 
 **解决的痛点**
+
 - 未来格式升级时兼容性风险高
 - 缺少版本管理机制
 
 **技术架构设计**
+
 - Schema Registry：每个版本对应 schema 文件
 - Migration Pipeline：逐版本升级（v1 -> v2 -> v3）
 - 回滚机制：生成备份副本（`*.bak`）
 
 **模块结构（规划）**
+
 - `lib/commands/migrate.mjs`
 - `lib/schema/index.mjs`
 - `lib/schema/validators/*.mjs`
 - `lib/migrations/v1_to_v2.mjs`
 
 **接口设计（示例）**
+
 ```js
 export async function migrate({ from, to, dryRun = false }) {
   // validate(from) -> apply migrations -> validate(to) -> write
@@ -248,18 +286,22 @@ export async function migrate({ from, to, dryRun = false }) {
 ```
 
 **技术选型权衡**
+
 - JSON Schema：标准化强，但需要解析与验证实现
 - 手工校验：轻量，但难以维护与复用
 
 **测试策略与质量**
+
 - 单元测试：每个迁移函数的幂等性
 - 集成测试：升级后数据结构一致性与回滚恢复
 
 **性能基准与可观测性**
+
 - 基准：1k 配置迁移 < 100ms
 - 指标：`migrate.steps`、`migrate.duration_ms`
 
 **风险与技术债**
+
 - 数据丢失风险，必须默认 `--dry-run` 并提示备份
 
 ---
@@ -267,18 +309,22 @@ export async function migrate({ from, to, dryRun = false }) {
 #### 4. Smart Retention（智能保留策略）
 
 **解决的痛点**
+
 - 统一 60 天保留不够灵活
 - 无法区分重要记忆和临时记忆
 
 **技术架构设计**
+
 - Policy Engine：基于 `type`、`confidence_score`、`tags` 计算保留天数
 - 扩展点：支持自定义规则优先级和权重
 
 **模块结构（规划）**
+
 - `lib/retention/policy.mjs`
 - `lib/retention/scorer.mjs`
 
 **接口设计（示例）**
+
 ```js
 export function computeRetention(record, policy) {
   // 根据类型/置信度/标签返回 retentionDays
@@ -286,18 +332,22 @@ export function computeRetention(record, policy) {
 ```
 
 **技术选型权衡**
+
 - 规则优先：可解释性高
 - 统计学习：效果好但复杂度和依赖增加
 
 **测试策略与质量**
+
 - 单元测试：典型类型/置信度边界值
 - 集成测试：与 archive 聚合流程联动
 
 **性能基准与可观测性**
+
 - 基准：单条记录 < 1ms
 - 指标：`retention.days.avg`、`retention.policy.hit`
 
 **风险与技术债**
+
 - 规则配置过复杂时可解释性下降，需要默认模板
 
 ---
@@ -307,19 +357,23 @@ export function computeRetention(record, policy) {
 #### 5. Analytics Dashboard（统计报表）
 
 **解决的痛点**
+
 - 无法了解记忆系统的质量和价值
 - 缺少使用数据反馈
 
 **技术架构设计**
+
 - 聚合器：统计类型分布、去重率、趋势
 - 报告器：输出 Markdown/JSON
 
 **模块结构（规划）**
+
 - `lib/commands/analytics.mjs`
 - `lib/analytics/aggregate.mjs`
 - `lib/analytics/report.mjs`
 
 **接口设计（示例）**
+
 ```js
 export function generateReport({ period, format }) {
   // aggregate -> format
@@ -327,18 +381,22 @@ export function generateReport({ period, format }) {
 ```
 
 **技术选型权衡**
+
 - 即时统计：实现简单
 - 增量缓存：输出快但需维护缓存与失效
 
 **测试策略与质量**
+
 - 快照测试：Markdown 结构稳定
 - 集成测试：统计指标准确性
 
 **性能基准与可观测性**
+
 - 基准：10k 记录 < 1s
 - 指标：`analytics.report.duration_ms`
 
 **风险与技术债**
+
 - 报告格式变动可能影响用户脚本，需 `--format json` 保持稳定
 
 ---
@@ -346,21 +404,25 @@ export function generateReport({ period, format }) {
 #### 6. Privacy Guard（隐私保护）
 
 **解决的痛点**
+
 - 记忆可能包含敏感信息（API key、密码等）
 - 明文存储存在泄露风险
 
 **技术架构设计**
+
 - 两级保护：正则脱敏 + 可选加密
 - 加密策略：AES-256-GCM + scrypt 派生密钥
 - 密钥管理：环境变量 / 交互输入 / keyfile
 
 **模块结构（规划）**
+
 - `lib/commands/privacy.mjs`
 - `lib/privacy/redact.mjs`
 - `lib/privacy/crypto.mjs`
 - `lib/privacy/policies/*.mjs`
 
 **接口设计（示例）**
+
 ```js
 export function protectRecord(record, policy) {
   const redacted = redact(record, policy);
@@ -369,18 +431,22 @@ export function protectRecord(record, policy) {
 ```
 
 **技术选型权衡**
+
 - 脱敏：可检索但安全性有限
 - 加密：安全性强但检索受限（需解密）
 
 **测试策略与质量**
+
 - 轮转测试：同一数据可解密恢复
 - 正则覆盖：常见凭证与 token 模式
 
 **性能基准与可观测性**
+
 - 基准：单条记录 < 5ms
 - 指标：`privacy.encrypt.count`、`privacy.redact.count`
 
 **风险与技术债**
+
 - 密钥丢失不可恢复，需要明确风险提示与备份机制
 
 ---
@@ -390,21 +456,25 @@ export function protectRecord(record, policy) {
 #### 7. Semantic Dedupe & Recall（语义去重与召回）
 
 **解决的痛点**
+
 - 仅 Jaccard 去重可能漏掉语义重复
 - 无法语义相似召回
 
 **技术架构设计**
+
 - Embedding Provider：本地模型或插件式适配
 - 相似度引擎：cosine similarity + 阈值
 - 缓存：embedding 缓存以降低重复计算
 
 **模块结构（规划）**
+
 - `lib/commands/semantic.mjs`
 - `lib/semantic/embedder.mjs`
 - `lib/semantic/dedupe.mjs`
 - `lib/semantic/cache.mjs`
 
 **接口设计（示例）**
+
 ```js
 export async function semanticDedupe({ records, embedder, threshold }) {
   // embedding -> similarity -> dedupe -> output
@@ -412,18 +482,22 @@ export async function semanticDedupe({ records, embedder, threshold }) {
 ```
 
 **技术选型权衡**
+
 - 本地模型：无需联网但体积大
 - 远程服务：效果好但引入隐私与成本风险
 
 **测试策略与质量**
+
 - 固定语料集：确保相似度稳定
 - 回归测试：避免阈值变化导致去重比例波动
 
 **性能基准与可观测性**
+
 - 基准：1k 记录 embedding < 3s
 - 指标：`semantic.embed.duration_ms`、`semantic.dedupe.rate`
 
 **风险与技术债**
+
 - 模型版本变动导致结果漂移，需要版本锁与回放验证
 
 ---
@@ -469,6 +543,7 @@ export async function semanticDedupe({ records, embedder, threshold }) {
     - [ ] 1k 迁移 < 100ms
 
 **交付物**
+
 - 3 个新命令可用
 - 基础测试覆盖
 - 文档更新
@@ -496,6 +571,7 @@ export async function semanticDedupe({ records, embedder, threshold }) {
     - [ ] 10k 记录报告生成 < 1s
 
 **交付物**
+
 - 智能保留系统上线
 - 月度统计报表功能
 - 配置文档完善
@@ -524,6 +600,7 @@ export async function semanticDedupe({ records, embedder, threshold }) {
     - [ ] 1k 记录 < 3s
 
 **交付物**
+
 - 隐私保护方案落地
 - 智能去重能力提升
 - 完整功能测试
@@ -535,41 +612,49 @@ export async function semanticDedupe({ records, embedder, threshold }) {
 ### CLI 交互流程（按命令）
 
 **setup**
+
 1. 解析 `--global/--local`，无参数时提示选择
 2. 合并 hooks.json，拷贝 hook/skill/command
 3. 输出摘要与下一步提示
 
 **archive**
+
 1. 解析 `--dry-run/--threshold/--limit`
 2. 运行归档 runner（含锁与隔离区）
 3. 输出归档统计（处理数、去重数、隔离数）
 
 **doctor**
+
 1. 执行诊断检查
 2. 输出错误定位 + 修复建议
 3. 提供 `--json` 供脚本集成
 
 **search**
+
 1. 解析过滤条件
 2. 选择索引或全量扫描
 3. 输出结果与下一步建议（如 `--reindex`）
 
 **migrate**
+
 1. 检测 schema 版本
 2. 默认 `--dry-run` 输出变更摘要
 3. 应用迁移并备份
 
 **analytics**
+
 1. 选择周期与格式
 2. 输出报表与趋势摘要
 3. 提示导出路径
 
 **privacy**
+
 1. 选择策略（脱敏/加密）
 2. 提示风险与密钥保存建议
 3. 输出保护报告
 
 **semantic**
+
 1. 检查 embedding provider
 2. 运行语义去重或召回
 3. 输出相似度阈值统计
@@ -647,6 +732,7 @@ export async function semanticDedupe({ records, embedder, threshold }) {
 ### 插件扩展机制设计
 
 **插件结构**
+
 ```
 plugins/
   my-plugin/
@@ -655,6 +741,7 @@ plugins/
 ```
 
 **插件协议（示例）**
+
 ```js
 export function activate(ctx) {
   ctx.registerCommand("plugin:foo", () => {});
@@ -662,6 +749,7 @@ export function activate(ctx) {
 ```
 
 **加载流程（Mermaid）**
+
 ```mermaid
 sequenceDiagram
   participant CLI
@@ -684,14 +772,17 @@ sequenceDiagram
 ## 成功指标（细化）
 
 ### 短期（1-2 周）
+
 - [ ] Doctor 命令诊断准确率 > 90%
 - [ ] Search 命令响应时间 < 100ms（1000 条记忆）
 
 ### 中期（1-2 月）
+
 - [ ] 用户满意度 > 4.5/5
 - [ ] 配置错误 issues 减少 80%
 
 ### 长期（3-6 月）
+
 - [ ] npm 周下载量 > 500
 - [ ] GitHub Stars > 100
 - [ ] 社区贡献者 > 5
@@ -719,7 +810,7 @@ sequenceDiagram
 
 ### 变更历史
 
-| 日期 | 版本 | 变更 |
-|-----|------|-----|
+| 日期       | 版本 | 变更                                   |
+| ---------- | ---- | -------------------------------------- |
 | 2026-02-01 | v1.1 | 增强技术深度、实施细节、风险与生态说明 |
-| 2026-02-01 | v1.0 | 初始版本，基于 Codex 分析 |
+| 2026-02-01 | v1.0 | 初始版本，基于 Codex 分析              |
