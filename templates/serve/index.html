@@ -94,8 +94,16 @@
         --shadow-soft: 0 14px 36px rgba(15, 23, 42, 0.08);
         --shadow-card: 0 22px 46px rgba(15, 23, 42, 0.08);
         --page-glow:
-          radial-gradient(circle at top left, rgba(37, 99, 235, 0.15), transparent 34%),
-          radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 28%),
+          radial-gradient(
+            circle at top left,
+            rgba(37, 99, 235, 0.15),
+            transparent 34%
+          ),
+          radial-gradient(
+            circle at top right,
+            rgba(14, 165, 233, 0.12),
+            transparent 28%
+          ),
           linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
       }
 
@@ -126,8 +134,16 @@
           --shadow-soft: 0 16px 40px rgba(2, 6, 23, 0.42);
           --shadow-card: 0 26px 52px rgba(2, 6, 23, 0.5);
           --page-glow:
-            radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 30%),
-            radial-gradient(circle at top right, rgba(34, 197, 94, 0.1), transparent 24%),
+            radial-gradient(
+              circle at top left,
+              rgba(56, 189, 248, 0.12),
+              transparent 30%
+            ),
+            radial-gradient(
+              circle at top right,
+              rgba(34, 197, 94, 0.1),
+              transparent 24%
+            ),
             linear-gradient(180deg, #020617 0%, #07101f 100%);
         }
       }
@@ -158,8 +174,16 @@
         --shadow-soft: 0 16px 40px rgba(2, 6, 23, 0.42);
         --shadow-card: 0 26px 52px rgba(2, 6, 23, 0.5);
         --page-glow:
-          radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 30%),
-          radial-gradient(circle at top right, rgba(34, 197, 94, 0.1), transparent 24%),
+          radial-gradient(
+            circle at top left,
+            rgba(56, 189, 248, 0.12),
+            transparent 30%
+          ),
+          radial-gradient(
+            circle at top right,
+            rgba(34, 197, 94, 0.1),
+            transparent 24%
+          ),
           linear-gradient(180deg, #020617 0%, #07101f 100%);
       }
 
@@ -176,9 +200,7 @@
 
       body {
         font-family: var(--font-sans);
-        background:
-          var(--page-glow),
-          var(--bg-primary);
+        background: var(--page-glow), var(--bg-primary);
         color: var(--text-primary);
         line-height: 1.6;
         overflow: hidden;
@@ -623,7 +645,11 @@
         padding: 20px 22px;
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
-        background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-strong) 100%);
+        background: linear-gradient(
+          180deg,
+          var(--bg-card) 0%,
+          var(--bg-card-strong) 100%
+        );
         box-shadow: var(--shadow-soft);
       }
 
@@ -727,7 +753,11 @@
         padding: 18px 20px;
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
-        background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-strong) 100%);
+        background: linear-gradient(
+          180deg,
+          var(--bg-card) 0%,
+          var(--bg-card-strong) 100%
+        );
         box-shadow: var(--shadow-soft);
         opacity: 0;
         transform: translateY(10px);
@@ -912,23 +942,112 @@
         text-decoration: underline;
       }
 
-      .card-alternatives {
-        margin-bottom: 12px;
-        padding: 12px 14px;
-        border-radius: var(--radius-sm);
-        background: var(--bg-elevated);
+      .card-decision {
+        margin-bottom: 14px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: linear-gradient(
+          180deg,
+          var(--bg-card-strong) 0%,
+          var(--bg-elevated) 100%
+        );
+        box-shadow: var(--shadow-soft);
+      }
+
+      .card-decision-header {
+        margin-bottom: 14px;
+      }
+
+      .card-decision-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--type-decision);
+      }
+
+      .card-decision-caption {
+        margin-top: 6px;
         color: var(--text-muted);
         font-size: 12px;
+        line-height: 1.6;
       }
 
-      .card-alternatives dt {
-        margin-bottom: 4px;
+      .card-decision-picked,
+      .card-decision-reason,
+      .decision-alt-item {
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line-soft);
+      }
+
+      .card-decision-picked {
+        padding: 14px;
+        background: var(--accent-contrast);
+        border-color: rgba(37, 99, 235, 0.22);
+      }
+
+      .card-decision-picked-value {
+        color: var(--text-primary);
+        font-size: 15px;
         font-weight: 700;
-        color: var(--text-secondary);
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
-      .card-alternatives dd {
-        margin-left: 16px;
+      .card-decision-reason {
+        margin-top: 12px;
+        padding: 14px;
+        background: var(--bg-card);
+      }
+
+      .card-decision-section-title,
+      .decision-alt-label {
+        margin-bottom: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .card-decision-alternatives {
+        margin-top: 14px;
+      }
+
+      .card-decision-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .decision-alt-item {
+        padding: 14px;
+        background: var(--bg-card);
+      }
+
+      .decision-alt-name {
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .decision-alt-why {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--line-soft);
+      }
+
+      .decision-alt-reason {
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       .source-toggle {
@@ -1004,7 +1123,11 @@
         padding: 16px 18px;
         border: 1px solid var(--border);
         border-radius: var(--radius-md);
-        background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-strong) 100%);
+        background: linear-gradient(
+          180deg,
+          var(--bg-card) 0%,
+          var(--bg-card-strong) 100%
+        );
         box-shadow: var(--shadow-soft);
       }
 
@@ -1402,12 +1525,102 @@
         return group;
       }
 
-      function renderDetailBlock(labelText, value) {
-        if (value === undefined || value === null || value === "") return null;
-        const block = el("div", "card-detail");
-        block.appendChild(el("div", "card-detail-label", labelText));
-        block.appendChild(el("div", "card-detail-value", String(value)));
-        return block;
+      function renderDecisionSummary(mem) {
+        const selected =
+          mem.selected_option === undefined ||
+          mem.selected_option === null ||
+          mem.selected_option === ""
+            ? ""
+            : String(mem.selected_option);
+        const reasoning =
+          mem.reasoning === undefined ||
+          mem.reasoning === null ||
+          mem.reasoning === ""
+            ? ""
+            : String(mem.reasoning);
+        const alternatives = Array.isArray(mem.alternatives)
+          ? mem.alternatives.filter((alt) => alt && (alt.option || alt.why_not))
+          : [];
+
+        if (!selected && !reasoning && alternatives.length === 0) return null;
+
+        const section = el("section", "card-decision");
+        const header = el("div", "card-decision-header");
+        header.appendChild(
+          el("div", "card-decision-title", "Decision snapshot"),
+        );
+
+        let caption = "This captures the final choice for the decision.";
+        if (selected && reasoning && alternatives.length > 0) {
+          caption =
+            "Chosen option first, then the reasoning and alternatives that were considered but not selected.";
+        } else if (alternatives.length > 0) {
+          caption =
+            "These are the options that were considered, with the final choice shown first when available.";
+        } else if (reasoning) {
+          caption =
+            "This captures the final choice and the reasoning behind it.";
+        }
+        header.appendChild(el("p", "card-decision-caption", caption));
+        section.appendChild(header);
+
+        if (selected) {
+          const picked = el("div", "card-decision-picked");
+          picked.appendChild(
+            el("div", "card-decision-section-title", "Chosen option"),
+          );
+          picked.appendChild(el("div", "card-decision-picked-value", selected));
+          section.appendChild(picked);
+        }
+
+        if (reasoning) {
+          const reason = el("div", "card-decision-reason");
+          reason.appendChild(
+            el("div", "card-decision-section-title", "Why this choice"),
+          );
+          reason.appendChild(el("div", "card-detail-value", reasoning));
+          section.appendChild(reason);
+        }
+
+        if (alternatives.length > 0) {
+          const altSection = el("div", "card-decision-alternatives");
+          altSection.appendChild(
+            el("div", "card-decision-section-title", "Alternatives considered"),
+          );
+          altSection.appendChild(
+            el(
+              "p",
+              "card-decision-caption",
+              "Options evaluated but not adopted.",
+            ),
+          );
+
+          const list = el("div", "card-decision-list");
+          for (const alt of alternatives) {
+            const item = el("article", "decision-alt-item");
+            item.appendChild(
+              el("div", "decision-alt-name", alt.option || "Alternative"),
+            );
+
+            if (alt.why_not) {
+              const why = el("div", "decision-alt-why");
+              why.appendChild(
+                el("div", "decision-alt-label", "Not selected because"),
+              );
+              why.appendChild(
+                el("div", "decision-alt-reason", String(alt.why_not)),
+              );
+              item.appendChild(why);
+            }
+
+            list.appendChild(item);
+          }
+
+          altSection.appendChild(list);
+          section.appendChild(altSection);
+        }
+
+        return section;
       }
 
       function serializeSuggestion(value) {
@@ -1429,20 +1642,28 @@
 
           if (item && typeof item === "object" && !Array.isArray(item)) {
             const header = el("div", "suggestion-header");
-            if (item.type) header.appendChild(el("span", "meta-chip", String(item.type)));
+            if (item.type)
+              header.appendChild(el("span", "meta-chip", String(item.type)));
             if (item.severity) {
-              header.appendChild(el("span", "meta-chip", String(item.severity)));
+              header.appendChild(
+                el("span", "meta-chip", String(item.severity)),
+              );
             }
             if (header.childNodes.length > 0) {
               card.appendChild(header);
             }
 
             const message =
-              item.message ?? item.content ?? item.title ?? serializeSuggestion(item);
+              item.message ??
+              item.content ??
+              item.title ??
+              serializeSuggestion(item);
             card.appendChild(el("div", "suggestion-message", message));
 
             if (item.context) {
-              card.appendChild(el("div", "suggestion-context", String(item.context)));
+              card.appendChild(
+                el("div", "suggestion-context", String(item.context)),
+              );
             }
           } else {
             card.appendChild(
@@ -1598,12 +1819,7 @@
         return button;
       }
 
-      function createDocumentHeader({
-        className,
-        title,
-        metaItems,
-        shareKey,
-      }) {
+      function createDocumentHeader({ className, title, metaItems, shareKey }) {
         const header = el("div", className);
         const top = el("div", "document-header-top");
         const main = el("div", "document-header-main");
@@ -1694,7 +1910,9 @@
         if (!shareKey) {
           invalidateActiveRequest();
           clearActiveSelection();
-          renderContentNode(renderEmptyState("Select a memory file to preview"));
+          renderContentNode(
+            renderEmptyState("Select a memory file to preview"),
+          );
           return;
         }
 
@@ -1738,7 +1956,9 @@
         }
         if (button) {
           const actionLabel =
-            nextTheme === "dark" ? "Switch to dark theme" : "Switch to light theme";
+            nextTheme === "dark"
+              ? "Switch to dark theme"
+              : "Switch to light theme";
           button.setAttribute("aria-label", actionLabel);
           button.title = actionLabel;
         }
@@ -1754,11 +1974,13 @@
           }
         });
 
-        document.getElementById("themeToggleBtn").addEventListener("click", () => {
-          const nextTheme = state.theme === "dark" ? "light" : "dark";
-          localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-          applyTheme(nextTheme);
-        });
+        document
+          .getElementById("themeToggleBtn")
+          .addEventListener("click", () => {
+            const nextTheme = state.theme === "dark" ? "light" : "dark";
+            localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+            applyTheme(nextTheme);
+          });
       }
 
       /* ============================================================
@@ -1949,10 +2171,8 @@
    File loading & Memory rendering
    ============================================================ */
       async function loadFile(fileId, options = {}) {
-        const {
-          historyMode = "push",
-          shareKey: providedShareKey = null,
-        } = options;
+        const { historyMode = "push", shareKey: providedShareKey = null } =
+          options;
         if (state.searchMode) {
           exitSearchMode();
         }
@@ -1993,8 +2213,12 @@
               renderInfoState({
                 eyebrow: "Load Error",
                 title: "Unable to open this memory file",
-                description: doc.error || "The memory document returned an error.",
-                tips: ["Try refreshing the tree", "Check whether the file still exists"],
+                description:
+                  doc.error || "The memory document returned an error.",
+                tips: [
+                  "Try refreshing the tree",
+                  "Check whether the file still exists",
+                ],
               }),
             );
           } else {
@@ -2115,13 +2339,13 @@
           card.appendChild(el("div", "card-content", mem.content));
         }
 
-        if (mem.reasoning) {
+        if (mem.type === "decision") {
+          const decisionSummary = renderDecisionSummary(mem);
+          if (decisionSummary) {
+            card.appendChild(decisionSummary);
+          }
+        } else if (mem.reasoning) {
           card.appendChild(el("div", "card-reasoning", mem.reasoning));
-        }
-
-        if (mem.type === "decision" && mem.selected_option) {
-          const selected = renderDetailBlock("Selected", mem.selected_option);
-          if (selected) card.appendChild(selected);
         }
 
         if (typeof mem.confidence_score === "number") {
@@ -2167,10 +2391,7 @@
           if (tags) card.appendChild(tags);
         }
 
-        if (
-          Array.isArray(mem.target_agents) &&
-          mem.target_agents.length > 0
-        ) {
+        if (Array.isArray(mem.target_agents) && mem.target_agents.length > 0) {
           const tags = renderTagGroup("Target agents", mem.target_agents);
           if (tags) card.appendChild(tags);
         }
@@ -2195,21 +2416,6 @@
             }
           }
           card.appendChild(urlDiv);
-        }
-
-        if (
-          mem.type === "decision" &&
-          Array.isArray(mem.alternatives) &&
-          mem.alternatives.length > 0
-        ) {
-          const dl = el("dl", "card-alternatives");
-          for (const alt of mem.alternatives) {
-            const dt = el("dt", "", alt.option || "");
-            const dd = el("dd", "", alt.why_not || "");
-            dl.appendChild(dt);
-            dl.appendChild(dd);
-          }
-          card.appendChild(dl);
         }
 
         if (mem.source_chunk) {
@@ -2274,7 +2480,9 @@
                 shareKey: state.activeShareKey,
               });
             } else {
-              renderContentNode(renderEmptyState("Select a memory file to preview"));
+              renderContentNode(
+                renderEmptyState("Select a memory file to preview"),
+              );
             }
             return;
           }
@@ -2292,7 +2500,9 @@
                 shareKey: state.activeShareKey,
               });
             } else {
-              renderContentNode(renderEmptyState("Select a memory file to preview"));
+              renderContentNode(
+                renderEmptyState("Select a memory file to preview"),
+              );
             }
           }
         });
@@ -2331,7 +2541,11 @@
                 title: "No matching memories found",
                 description:
                   "Try a broader keyword, search for a tool name, or open a session from the sidebar to inspect the full memory trail.",
-                tips: ["Search title keywords", "Search entity names", "Search tool names"],
+                tips: [
+                  "Search title keywords",
+                  "Search entity names",
+                  "Search tool names",
+                ],
               }),
             );
             return;
@@ -2362,7 +2576,8 @@
             hitEl.appendChild(snippetEl);
 
             makeInteractive(hitEl, () => {
-              const shareKey = getTreeEntryByFileId(hit.fileId)?.shareKey || null;
+              const shareKey =
+                getTreeEntryByFileId(hit.fileId)?.shareKey || null;
               loadFile(hit.fileId, {
                 historyMode: "push",
                 source: "search",
@@ -2388,7 +2603,10 @@
               eyebrow: "Search Error",
               title: "Search request failed",
               description: err.message,
-              tips: ["Retry with the same query", "Check whether the search endpoint is reachable"],
+              tips: [
+                "Retry with the same query",
+                "Check whether the search endpoint is reachable",
+              ],
             }),
           );
         }
