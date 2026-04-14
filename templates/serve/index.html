@@ -1,0 +1,1302 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cursor Memory Viewer</title>
+    <style>
+      /* ============================================================
+   CSS Variables & Reset
+   ============================================================ */
+      :root {
+        --bg-primary: #1a1a2e;
+        --bg-secondary: #16213e;
+        --bg-tertiary: #0f3460;
+        --bg-card: #1a1a2e;
+        --text-primary: #e0e0e0;
+        --text-secondary: #a0a0b0;
+        --text-muted: #6c6c80;
+        --accent: #00d2ff;
+        --accent-dim: #0098b8;
+        --border: #2a2a4a;
+        --sidebar-width: 300px;
+        --header-height: 52px;
+        --transition-speed: 0.25s;
+
+        /* type badge colors */
+        --type-decision: #4a9eff;
+        --type-insight: #4ade80;
+        --type-confidence: #a78bfa;
+        --type-pattern_seed: #f59e0b;
+        --type-commitment: #f472b6;
+        --type-learning: #34d399;
+        --type-correction: #ef4444;
+        --type-cross_agent: #818cf8;
+        --type-workflow_note: #94a3b8;
+        --type-gap: #fb923c;
+
+        /* confidence colors */
+        --conf-low: #f59e0b;
+        --conf-mid: #4a9eff;
+        --conf-high: #4ade80;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        :root {
+          --transition-speed: 0s;
+        }
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.5;
+        overflow: hidden;
+        height: 100vh;
+      }
+
+      /* ============================================================
+   Layout
+   ============================================================ */
+      .app {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      .header {
+        height: var(--header-height);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border);
+        gap: 12px;
+        flex-shrink: 0;
+      }
+
+      .header-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+
+      .header-search {
+        flex: 1;
+        max-width: 400px;
+        position: relative;
+      }
+
+      .header-search input {
+        width: 100%;
+        padding: 6px 12px 6px 32px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 13px;
+        outline: none;
+        transition: border-color var(--transition-speed);
+      }
+
+      .header-search input:focus {
+        border-color: var(--accent);
+      }
+
+      .header-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        font-size: 13px;
+        pointer-events: none;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 8px;
+        margin-left: auto;
+      }
+
+      .btn {
+        padding: 5px 12px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        font-size: 12px;
+        cursor: pointer;
+        transition:
+          background var(--transition-speed),
+          border-color var(--transition-speed);
+      }
+      .btn:hover {
+        border-color: var(--accent);
+      }
+
+      .main {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* ============================================================
+   Sidebar / Tree
+   ============================================================ */
+      .sidebar {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border);
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        padding: 8px 0;
+      }
+
+      .tree-empty {
+        padding: 24px 16px;
+        color: var(--text-muted);
+        font-size: 13px;
+        text-align: center;
+        line-height: 1.8;
+      }
+
+      /* project level */
+      .tree-project {
+        margin-bottom: 2px;
+      }
+
+      .tree-project-header {
+        display: flex;
+        align-items: center;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        transition: background var(--transition-speed);
+        user-select: none;
+      }
+      .tree-project-header:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .tree-arrow {
+        display: inline-block;
+        width: 16px;
+        font-size: 10px;
+        color: var(--text-muted);
+        transition: transform var(--transition-speed);
+        flex-shrink: 0;
+      }
+      .tree-arrow.open {
+        transform: rotate(90deg);
+      }
+
+      .tree-project-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tree-children {
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        transition:
+          max-height var(--transition-speed) ease,
+          opacity var(--transition-speed) ease;
+      }
+      .tree-children.open {
+        max-height: 9999px;
+        opacity: 1;
+      }
+
+      /* section label (memories / archive / aggregates) */
+      .tree-section {
+        padding: 4px 12px 4px 28px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* date/month group */
+      .tree-group-label {
+        padding: 3px 12px 3px 36px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .tree-group-label:hover {
+        color: var(--text-primary);
+      }
+      .tree-group-label .tree-arrow {
+        width: 12px;
+        font-size: 9px;
+      }
+
+      .tree-group-children {
+        overflow: hidden;
+        max-height: 0;
+        opacity: 0;
+        transition:
+          max-height var(--transition-speed) ease,
+          opacity var(--transition-speed) ease;
+      }
+      .tree-group-children.open {
+        max-height: 9999px;
+        opacity: 1;
+      }
+
+      /* file leaf node */
+      .tree-file {
+        padding: 3px 12px 3px 48px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        transition:
+          background var(--transition-speed),
+          color var(--transition-speed);
+      }
+      .tree-file:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-primary);
+      }
+      .tree-file.active {
+        background: rgba(0, 210, 255, 0.1);
+        color: var(--accent);
+      }
+
+      /* ============================================================
+   Content Area
+   ============================================================ */
+      .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        scroll-behavior: smooth;
+      }
+
+      .content-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-muted);
+        font-size: 14px;
+      }
+
+      .content-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-muted);
+      }
+
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-right: 10px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* session header */
+      .session-header {
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .session-id {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+        word-break: break-all;
+      }
+
+      .session-meta {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      /* aggregate header */
+      .aggregate-header {
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .aggregate-stats {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .stat-card {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        min-width: 120px;
+      }
+      .stat-card-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .stat-card-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      /* ============================================================
+   Memory Cards
+   ============================================================ */
+      .memory-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        opacity: 0;
+        transform: translateY(8px);
+        animation: cardIn var(--transition-speed) ease forwards;
+      }
+
+      @keyframes cardIn {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .card-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+
+      .type-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .card-content {
+        font-size: 13px;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin-bottom: 10px;
+        line-height: 1.6;
+      }
+
+      .card-reasoning {
+        font-size: 12px;
+        font-style: italic;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+        padding-left: 12px;
+        border-left: 2px solid var(--border);
+      }
+
+      /* confidence bar */
+      .confidence-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .confidence-bar-bg {
+        flex: 1;
+        max-width: 200px;
+        height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .confidence-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        width: 0;
+        transition: width 0.6s ease;
+      }
+
+      /* entities / tags */
+      .card-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 8px;
+      }
+
+      .entity-tag {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-secondary);
+      }
+
+      /* urls */
+      .card-urls {
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+      .card-urls a {
+        color: var(--accent-dim);
+        text-decoration: none;
+        word-break: break-all;
+      }
+      .card-urls a:hover {
+        text-decoration: underline;
+      }
+
+      /* alternatives */
+      .card-alternatives {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+      }
+      .card-alternatives dt {
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+      .card-alternatives dd {
+        margin-left: 16px;
+        margin-bottom: 4px;
+      }
+
+      /* source chunk collapsible */
+      .source-toggle {
+        font-size: 12px;
+        color: var(--accent-dim);
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+      .source-toggle:hover {
+        color: var(--accent);
+      }
+
+      .source-chunk {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height var(--transition-speed) ease;
+        font-size: 12px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+      }
+      .source-chunk.open {
+        max-height: 2000px;
+        padding: 12px;
+      }
+      .source-chunk .msg-user {
+        color: var(--type-decision);
+        font-weight: 600;
+      }
+      .source-chunk .msg-assistant {
+        color: var(--type-insight);
+        font-weight: 600;
+      }
+
+      /* ============================================================
+   Search Results
+   ============================================================ */
+      .search-results-header {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+      }
+
+      .search-hit {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: border-color var(--transition-speed);
+      }
+      .search-hit:hover {
+        border-color: var(--accent-dim);
+      }
+
+      .search-hit-project {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+
+      .search-hit-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+      }
+
+      .search-hit-snippet {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+
+      mark {
+        background: rgba(0, 210, 255, 0.25);
+        color: var(--accent);
+        padding: 0 1px;
+        border-radius: 2px;
+      }
+
+      .search-empty {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 40px 0;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- ============================================================
+       Header
+       ============================================================ -->
+      <header class="header">
+        <span class="header-title">cursor-memory</span>
+        <div class="header-search">
+          <span class="header-search-icon">&#128269;</span>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search memories..."
+            autocomplete="off"
+          />
+        </div>
+        <div class="header-actions">
+          <button class="btn" id="refreshBtn" title="Refresh tree">
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <!-- ============================================================
+       Main: Sidebar + Content
+       ============================================================ -->
+      <div class="main">
+        <nav class="sidebar" id="sidebar"></nav>
+        <main class="content" id="content">
+          <div class="content-empty">Select a memory file to preview</div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      /* ============================================================
+   State
+   ============================================================ */
+      const state = {
+        tree: null,
+        activeFileId: null,
+        searchMode: false,
+        searchAbort: null,
+      };
+
+      /* ============================================================
+   API helpers
+   ============================================================ */
+      async function apiGet(url) {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+      }
+
+      async function apiPost(url) {
+        const res = await fetch(url, { method: "POST" });
+        return res.json();
+      }
+
+      /* ============================================================
+   Utility: safe text
+   ============================================================ */
+      function txt(parent, text) {
+        parent.appendChild(document.createTextNode(text));
+      }
+
+      function el(tag, className, textContent) {
+        const e = document.createElement(tag);
+        if (className) e.className = className;
+        if (textContent !== undefined) txt(e, textContent);
+        return e;
+      }
+
+      /* ============================================================
+   Tree rendering
+   ============================================================ */
+      function renderTree(projects) {
+        const sidebar = document.getElementById("sidebar");
+        sidebar.innerHTML = "";
+
+        if (!projects || projects.length === 0) {
+          const empty = el("div", "tree-empty");
+          txt(empty, "No memories/ directories found.\nCheck the root path.");
+          sidebar.appendChild(empty);
+          return;
+        }
+
+        for (const project of projects) {
+          const projectEl = el("div", "tree-project");
+
+          // project header
+          const header = el("div", "tree-project-header");
+          const arrow = el("span", "tree-arrow", "\u25B6");
+          const nameSpan = el("span", "tree-project-name", project.displayName);
+          nameSpan.title = project.projectId;
+          header.appendChild(arrow);
+          header.appendChild(nameSpan);
+          projectEl.appendChild(header);
+
+          // children container
+          const children = el("div", "tree-children");
+
+          // memories section
+          if (project.memories && project.memories.length > 0) {
+            children.appendChild(el("div", "tree-section", "Memories"));
+            for (const group of project.memories) {
+              renderDateGroup(children, group);
+            }
+          }
+
+          // archive section
+          if (project.archive && project.archive.length > 0) {
+            children.appendChild(el("div", "tree-section", "Archive"));
+            for (const group of project.archive) {
+              renderMonthGroup(children, group);
+            }
+          }
+
+          // aggregates section
+          if (project.aggregates && project.aggregates.length > 0) {
+            children.appendChild(el("div", "tree-section", "Aggregates"));
+            for (const agg of project.aggregates) {
+              const fileEl = el("div", "tree-file", agg.name);
+              fileEl.dataset.fileId = agg.id;
+              fileEl.addEventListener("click", () => loadFile(agg.id));
+              children.appendChild(fileEl);
+            }
+          }
+
+          projectEl.appendChild(children);
+
+          // toggle
+          header.addEventListener("click", () => {
+            arrow.classList.toggle("open");
+            children.classList.toggle("open");
+          });
+
+          sidebar.appendChild(projectEl);
+        }
+
+        // auto-expand first project
+        const firstArrow = sidebar.querySelector(".tree-arrow");
+        const firstChildren = sidebar.querySelector(".tree-children");
+        if (firstArrow && firstChildren) {
+          firstArrow.classList.add("open");
+          firstChildren.classList.add("open");
+        }
+      }
+
+      function renderDateGroup(parent, group) {
+        const labelEl = el("div", "tree-group-label");
+        const arrow = el("span", "tree-arrow", "\u25B6");
+        labelEl.appendChild(arrow);
+        txt(labelEl, group.date);
+        parent.appendChild(labelEl);
+
+        const childrenEl = el("div", "tree-group-children");
+        for (const file of group.files) {
+          const fileEl = el("div", "tree-file");
+          const name = file.name
+            .replace(/\.json$/, "")
+            .replace(/^\d{2}-\d{2}-\d{2}-/, "");
+          txt(fileEl, name || file.name);
+          fileEl.title = file.name;
+          fileEl.dataset.fileId = file.id;
+          fileEl.addEventListener("click", () => loadFile(file.id));
+          childrenEl.appendChild(fileEl);
+        }
+        parent.appendChild(childrenEl);
+
+        labelEl.addEventListener("click", () => {
+          arrow.classList.toggle("open");
+          childrenEl.classList.toggle("open");
+        });
+      }
+
+      function renderMonthGroup(parent, group) {
+        const labelEl = el("div", "tree-group-label");
+        const arrow = el("span", "tree-arrow", "\u25B6");
+        labelEl.appendChild(arrow);
+        txt(labelEl, group.month);
+        parent.appendChild(labelEl);
+
+        const childrenEl = el("div", "tree-group-children");
+        for (const file of group.files) {
+          const fileEl = el(
+            "div",
+            "tree-file",
+            file.name.replace(/\.json$/, ""),
+          );
+          fileEl.title = file.name;
+          fileEl.dataset.fileId = file.id;
+          fileEl.addEventListener("click", () => loadFile(file.id));
+          childrenEl.appendChild(fileEl);
+        }
+        parent.appendChild(childrenEl);
+
+        labelEl.addEventListener("click", () => {
+          arrow.classList.toggle("open");
+          childrenEl.classList.toggle("open");
+        });
+      }
+
+      /* ============================================================
+   File loading & Memory rendering
+   ============================================================ */
+      async function loadFile(fileId) {
+        exitSearchMode();
+        state.activeFileId = fileId;
+        updateActiveHighlight();
+
+        const content = document.getElementById("content");
+        content.innerHTML = "";
+        const loading = el("div", "content-loading");
+        loading.appendChild(el("div", "spinner"));
+        txt(loading, "Loading...");
+        content.appendChild(loading);
+
+        try {
+          const doc = await apiGet(`/api/memory/${fileId}`);
+          content.innerHTML = "";
+          if (doc.kind === "aggregate") {
+            renderAggregate(content, doc);
+          } else if (doc.kind === "error") {
+            content.appendChild(el("div", "content-empty", doc.error));
+          } else {
+            renderSession(content, doc);
+          }
+        } catch (err) {
+          content.innerHTML = "";
+          content.appendChild(
+            el("div", "content-empty", `Error: ${err.message}`),
+          );
+        }
+      }
+
+      function renderSession(container, doc) {
+        // header
+        const header = el("div", "session-header");
+        header.appendChild(
+          el("div", "session-id", doc.session_id || "Unknown Session"),
+        );
+        const meta = el("div", "session-meta");
+        if (doc.timestamp) txt(meta, doc.timestamp);
+        if (doc.extraction_count) {
+          const sep = el(
+            "span",
+            "",
+            ` \u00B7 Extraction #${doc.extraction_count}`,
+          );
+          meta.appendChild(sep);
+        }
+        header.appendChild(meta);
+        container.appendChild(header);
+
+        // memories
+        const memories = Array.isArray(doc.memories) ? doc.memories : [];
+        for (let i = 0; i < memories.length; i++) {
+          const card = renderMemoryCard(memories[i], i);
+          card.style.animationDelay = `${i * 0.05}s`;
+          card.id = `memory-${i}`;
+          container.appendChild(card);
+        }
+      }
+
+      function renderAggregate(container, doc) {
+        const header = el("div", "aggregate-header");
+        header.appendChild(
+          el("div", "session-id", `Aggregate: ${doc.month || "Unknown"}`),
+        );
+        const meta = el("div", "session-meta");
+        if (doc.generated_at) txt(meta, `Generated: ${doc.generated_at}`);
+        header.appendChild(meta);
+
+        if (doc.stats) {
+          const statsRow = el("div", "aggregate-stats");
+          for (const [key, val] of Object.entries(doc.stats)) {
+            const card = el("div", "stat-card");
+            card.appendChild(el("div", "stat-card-value", String(val)));
+            card.appendChild(
+              el("div", "stat-card-label", key.replace(/_/g, " ")),
+            );
+            statsRow.appendChild(card);
+          }
+          header.appendChild(statsRow);
+        }
+        container.appendChild(header);
+
+        const memories = Array.isArray(doc.deduped_memories)
+          ? doc.deduped_memories
+          : [];
+        for (let i = 0; i < memories.length; i++) {
+          const card = renderMemoryCard(memories[i], i);
+          card.style.animationDelay = `${i * 0.05}s`;
+          container.appendChild(card);
+        }
+      }
+
+      /* ============================================================
+   Memory Card
+   ============================================================ */
+      const TYPE_COLORS = {
+        decision: "var(--type-decision)",
+        insight: "var(--type-insight)",
+        confidence: "var(--type-confidence)",
+        pattern_seed: "var(--type-pattern_seed)",
+        commitment: "var(--type-commitment)",
+        learning: "var(--type-learning)",
+        correction: "var(--type-correction)",
+        cross_agent: "var(--type-cross_agent)",
+        workflow_note: "var(--type-workflow_note)",
+        gap: "var(--type-gap)",
+      };
+
+      function renderMemoryCard(mem, index) {
+        const card = el("div", "memory-card");
+
+        // top row: badge + title
+        const top = el("div", "card-top");
+        const badge = el(
+          "span",
+          "type-badge",
+          (mem.type || "unknown").replace(/_/g, " "),
+        );
+        const color = TYPE_COLORS[mem.type] || "var(--text-muted)";
+        badge.style.background = color;
+        badge.style.color = "#fff";
+        top.appendChild(badge);
+        if (mem.title) top.appendChild(el("span", "card-title", mem.title));
+        card.appendChild(top);
+
+        // content
+        if (mem.content) {
+          card.appendChild(el("div", "card-content", mem.content));
+        }
+
+        // reasoning
+        if (mem.reasoning) {
+          card.appendChild(el("div", "card-reasoning", mem.reasoning));
+        }
+
+        // confidence
+        if (typeof mem.confidence_score === "number") {
+          const row = el("div", "confidence-row");
+          txt(row, "Confidence: ");
+          const barBg = el("div", "confidence-bar-bg");
+          const barFill = el("div", "confidence-bar-fill");
+          const score = mem.confidence_score;
+          const confColor =
+            score < 60
+              ? "var(--conf-low)"
+              : score < 80
+                ? "var(--conf-mid)"
+                : "var(--conf-high)";
+          barFill.style.background = confColor;
+          // trigger animation after paint
+          requestAnimationFrame(() => {
+            barFill.style.width = `${score}%`;
+          });
+          barBg.appendChild(barFill);
+          row.appendChild(barBg);
+          txt(row, ` ${score}`);
+          card.appendChild(row);
+        }
+
+        // entities
+        if (
+          Array.isArray(mem.related_entities) &&
+          mem.related_entities.length > 0
+        ) {
+          const tags = el("div", "card-tags");
+          for (const ent of mem.related_entities) {
+            const tag = el(
+              "span",
+              "entity-tag",
+              `${ent.type}: ${ent.raw || ent.slug || ""}`,
+            );
+            tags.appendChild(tag);
+          }
+          card.appendChild(tags);
+        }
+
+        // tools
+        if (
+          Array.isArray(mem.tools_mentioned) &&
+          mem.tools_mentioned.length > 0
+        ) {
+          const tags = el("div", "card-tags");
+          for (const tool of mem.tools_mentioned) {
+            tags.appendChild(el("span", "entity-tag", tool));
+          }
+          card.appendChild(tags);
+        }
+
+        // urls (safe: only http/https)
+        if (
+          Array.isArray(mem.urls_mentioned) &&
+          mem.urls_mentioned.length > 0
+        ) {
+          const urlDiv = el("div", "card-urls");
+          for (const u of mem.urls_mentioned) {
+            if (/^https?:\/\//i.test(u)) {
+              const a = document.createElement("a");
+              a.href = u;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              txt(a, u);
+              urlDiv.appendChild(a);
+              urlDiv.appendChild(document.createElement("br"));
+            } else {
+              urlDiv.appendChild(el("span", "", u));
+              urlDiv.appendChild(document.createElement("br"));
+            }
+          }
+          card.appendChild(urlDiv);
+        }
+
+        // alternatives
+        if (Array.isArray(mem.alternatives) && mem.alternatives.length > 0) {
+          const dl = el("dl", "card-alternatives");
+          for (const alt of mem.alternatives) {
+            const dt = el("dt", "", alt.option || "");
+            const dd = el("dd", "", alt.why_not || "");
+            dl.appendChild(dt);
+            dl.appendChild(dd);
+          }
+          card.appendChild(dl);
+        }
+
+        // source chunk
+        if (mem.source_chunk) {
+          const toggle = el("div", "source-toggle");
+          const toggleArrow = el("span", "tree-arrow", "\u25B6");
+          toggle.appendChild(toggleArrow);
+          txt(toggle, " Source conversation");
+          card.appendChild(toggle);
+
+          const chunkDiv = el("div", "source-chunk");
+          renderSourceChunk(chunkDiv, mem.source_chunk);
+          card.appendChild(chunkDiv);
+
+          toggle.addEventListener("click", () => {
+            toggleArrow.classList.toggle("open");
+            chunkDiv.classList.toggle("open");
+          });
+        }
+
+        return card;
+      }
+
+      function renderSourceChunk(container, text) {
+        const lines = text.split("\n");
+        for (const line of lines) {
+          const p = document.createElement("p");
+          if (line.startsWith("**User:**")) {
+            const label = el("span", "msg-user", "User: ");
+            p.appendChild(label);
+            txt(p, line.replace("**User:**", "").trim());
+          } else if (line.startsWith("**Assistant:**")) {
+            const label = el("span", "msg-assistant", "Assistant: ");
+            p.appendChild(label);
+            txt(p, line.replace("**Assistant:**", "").trim());
+          } else {
+            txt(p, line);
+          }
+          container.appendChild(p);
+        }
+      }
+
+      /* ============================================================
+   Search
+   ============================================================ */
+      let searchTimer = null;
+
+      function setupSearch() {
+        const input = document.getElementById("searchInput");
+        input.addEventListener("input", () => {
+          clearTimeout(searchTimer);
+          const q = input.value.trim();
+          if (!q) {
+            exitSearchMode();
+            return;
+          }
+          searchTimer = setTimeout(() => doSearch(q), 300);
+        });
+
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            input.value = "";
+            exitSearchMode();
+          }
+        });
+      }
+
+      async function doSearch(query) {
+        // abort previous
+        if (state.searchAbort) state.searchAbort.abort();
+        const controller = new AbortController();
+        state.searchAbort = controller;
+
+        state.searchMode = true;
+        const content = document.getElementById("content");
+        content.innerHTML = "";
+        const loading = el("div", "content-loading");
+        loading.appendChild(el("div", "spinner"));
+        txt(loading, "Searching...");
+        content.appendChild(loading);
+
+        try {
+          const res = await fetch(
+            `/api/search?q=${encodeURIComponent(query)}&limit=50`,
+            {
+              signal: controller.signal,
+            },
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          content.innerHTML = "";
+          if (data.results.length === 0) {
+            content.appendChild(
+              el("div", "search-empty", "No matching memories found."),
+            );
+            return;
+          }
+
+          content.appendChild(
+            el(
+              "div",
+              "search-results-header",
+              `${data.total} result${data.total !== 1 ? "s" : ""} found`,
+            ),
+          );
+
+          for (const hit of data.results) {
+            const hitEl = el("div", "search-hit");
+            hitEl.appendChild(
+              el(
+                "div",
+                "search-hit-project",
+                `${hit.displayName} / ${hit.fileName}`,
+              ),
+            );
+            hitEl.appendChild(el("div", "search-hit-title", hit.title));
+
+            // safe highlight
+            const snippetEl = el("div", "search-hit-snippet");
+            highlightText(snippetEl, hit.snippet, query);
+            hitEl.appendChild(snippetEl);
+
+            hitEl.addEventListener("click", () => {
+              loadFile(hit.fileId).then(() => {
+                const target = document.getElementById(
+                  `memory-${hit.memoryIndex}`,
+                );
+                if (target)
+                  target.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                  });
+              });
+            });
+            content.appendChild(hitEl);
+          }
+        } catch (err) {
+          if (err.name === "AbortError") return;
+          content.innerHTML = "";
+          content.appendChild(
+            el("div", "content-empty", `Search error: ${err.message}`),
+          );
+        }
+      }
+
+      function highlightText(container, text, query) {
+        if (!text || !query) {
+          txt(container, text || "");
+          return;
+        }
+        const lower = text.toLowerCase();
+        const qLower = query.toLowerCase();
+        let lastIdx = 0;
+        let idx = lower.indexOf(qLower);
+
+        while (idx !== -1) {
+          // text before match
+          if (idx > lastIdx) txt(container, text.slice(lastIdx, idx));
+          // match
+          const markEl = document.createElement("mark");
+          txt(markEl, text.slice(idx, idx + query.length));
+          container.appendChild(markEl);
+          lastIdx = idx + query.length;
+          idx = lower.indexOf(qLower, lastIdx);
+        }
+        // remaining text
+        if (lastIdx < text.length) txt(container, text.slice(lastIdx));
+      }
+
+      function exitSearchMode() {
+        if (!state.searchMode) return;
+        state.searchMode = false;
+        if (state.searchAbort) {
+          state.searchAbort.abort();
+          state.searchAbort = null;
+        }
+        const content = document.getElementById("content");
+        if (state.activeFileId) {
+          loadFile(state.activeFileId);
+        } else {
+          content.innerHTML = "";
+          content.appendChild(
+            el("div", "content-empty", "Select a memory file to preview"),
+          );
+        }
+      }
+
+      function updateActiveHighlight() {
+        document
+          .querySelectorAll(".tree-file.active")
+          .forEach((e) => e.classList.remove("active"));
+        if (state.activeFileId != null) {
+          const active = document.querySelector(
+            `.tree-file[data-file-id="${state.activeFileId}"]`,
+          );
+          if (active) active.classList.add("active");
+        }
+      }
+
+      /* ============================================================
+   Init
+   ============================================================ */
+      async function init() {
+        setupSearch();
+
+        document
+          .getElementById("refreshBtn")
+          .addEventListener("click", async () => {
+            await apiPost("/api/refresh");
+            state.tree = null;
+            state.activeFileId = null;
+            await loadTree();
+            document.getElementById("content").innerHTML = "";
+            document
+              .getElementById("content")
+              .appendChild(
+                el("div", "content-empty", "Select a memory file to preview"),
+              );
+          });
+
+        await loadTree();
+      }
+
+      async function loadTree() {
+        const sidebar = document.getElementById("sidebar");
+        sidebar.innerHTML = "";
+        const loading = el("div", "content-loading");
+        loading.appendChild(el("div", "spinner"));
+        txt(loading, "Scanning...");
+        sidebar.appendChild(loading);
+
+        try {
+          const data = await apiGet("/api/tree");
+          state.tree = data.projects;
+          renderTree(data.projects);
+        } catch (err) {
+          sidebar.innerHTML = "";
+          sidebar.appendChild(
+            el("div", "tree-empty", `Error loading tree: ${err.message}`),
+          );
+        }
+      }
+
+      /* ============================================================
+   Keyboard navigation
+   ============================================================ */
+      document.addEventListener("keydown", (e) => {
+        // Ctrl/Cmd + K to focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+          e.preventDefault();
+          document.getElementById("searchInput").focus();
+        }
+      });
+
+      init();
+    </script>
+  </body>
+</html>

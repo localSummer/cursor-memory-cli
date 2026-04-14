@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 
-import path from 'node:path';
-import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
-import { runSetup } from './lib/setup.mjs';
-import * as log from './lib/logger.mjs';
-import { select } from './lib/ui.mjs';
-import { resolveTargetDir } from './lib/constants.mjs';
+import path from "node:path";
+import fs from "node:fs";
+import { spawnSync } from "node:child_process";
+import { runSetup } from "./lib/setup.mjs";
+import * as log from "./lib/logger.mjs";
+import { select } from "./lib/ui.mjs";
+import { resolveTargetDir, DEFAULT_SERVE_PORT } from "./lib/constants.mjs";
 
 const USAGE = `Usage: node cli/cursor-memory-cli/index.mjs <command> [options]
 
 Commands:
   setup     Install cursor-memory components
   archive   Run memory archive manually
+  serve     Start memory preview server
 
 Options:
   --global    Install to ~/.cursor/ (user-level)
@@ -20,6 +21,7 @@ Options:
   --dry-run   Preview archive without moving files (archive command)
   --threshold <days>  Override retention days (archive command)
   --limit <n>  Override max files per run (archive command)
+  --port <n>  Server port (default: 3000, serve command only)
 
 If neither --global nor --local is specified, you will be prompted to choose.`;
 
@@ -30,38 +32,60 @@ function parseArgs() {
   let dryRun = false;
   let threshold = null;
   let limit = null;
+  let rootPath = null;
+  let port = null;
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
-    if (arg === 'setup') {
-      command = 'setup';
-    } else if (arg === 'archive') {
-      command = 'archive';
-    } else if (arg === '--global') {
-      mode = 'global';
-    } else if (arg === '--local') {
-      mode = 'local';
-    } else if (arg === '--dry-run') {
+    if (arg === "setup") {
+      command = "setup";
+    } else if (arg === "archive") {
+      command = "archive";
+    } else if (arg === "serve") {
+      command = "serve";
+    } else if (arg === "--global") {
+      mode = "global";
+    } else if (arg === "--local") {
+      mode = "local";
+    } else if (arg === "--dry-run") {
       dryRun = true;
-    } else if (arg === '--threshold') {
+    } else if (arg === "--threshold") {
       const value = args[i + 1];
-      if (value && !value.startsWith('--')) {
+      if (value && !value.startsWith("--")) {
         threshold = Number(value);
         i += 1;
       } else {
         threshold = null;
       }
-    } else if (arg === '--limit') {
+    } else if (arg === "--limit") {
       const value = args[i + 1];
-      if (value && !value.startsWith('--')) {
+      if (value && !value.startsWith("--")) {
         limit = Number(value);
         i += 1;
       } else {
         limit = null;
       }
-    } else if (arg === '--help' || arg === '-h') {
+    } else if (arg === "--port") {
+      const value = args[i + 1];
+      if (value && !value.startsWith("--")) {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed <= 0) {
+          log.error(`Invalid port number: ${value}`);
+          process.exit(1);
+        }
+        port = parsed;
+        i += 1;
+      } else {
+        log.error("--port requires a number argument");
+        process.exit(1);
+      }
+    } else if (arg === "--help" || arg === "-h") {
       console.log(USAGE);
       process.exit(0);
+    } else if (command === "serve" && !arg.startsWith("-")) {
+      if (!rootPath) {
+        rootPath = arg;
+      }
     } else {
       log.error(`Unknown argument: ${arg}`);
       console.log(USAGE);
@@ -69,34 +93,64 @@ function parseArgs() {
     }
   }
 
-  return { command, mode, dryRun, threshold, limit };
+  if (command === "serve" && mode) {
+    log.error("--global/--local cannot be used with serve command");
+    process.exit(1);
+  }
+
+  return { command, mode, dryRun, threshold, limit, rootPath, port };
 }
 
 async function promptMode() {
-  console.log('');
+  console.log("");
   return select({
-    question: 'Where would you like to install cursor-memory?',
+    question: "Where would you like to install cursor-memory?",
     options: [
-      { label: 'Global (~/.cursor/) - applies to all projects', value: 'global' },
-      { label: 'Local  (./.cursor/) - applies to current project only', value: 'local' }
+      {
+        label: "Global (~/.cursor/) - applies to all projects",
+        value: "global",
+      },
+      {
+        label: "Local  (./.cursor/) - applies to current project only",
+        value: "local",
+      },
     ],
-    defaultIndex: 0
+    defaultIndex: 0,
   });
 }
 
 async function main() {
-  const { command, mode, dryRun, threshold, limit } = parseArgs();
+  const { command, mode, dryRun, threshold, limit, rootPath: parsedRootPath, port: parsedPort } = parseArgs();
 
   if (!command) {
-    log.error('No command specified.');
+    log.error("No command specified.");
     console.log(USAGE);
     process.exit(1);
   }
 
-  if (command !== 'setup' && command !== 'archive') {
+  if (command !== "setup" && command !== "archive" && command !== "serve") {
     log.error(`Unknown command: ${command}`);
     console.log(USAGE);
     process.exit(1);
+  }
+
+  if (command === "serve") {
+    const rootPath = parsedRootPath || process.cwd();
+    try {
+      fs.accessSync(rootPath, fs.constants.R_OK);
+    } catch {
+      log.error(`Root directory not found or not readable: ${rootPath}`);
+      process.exit(1);
+    }
+    const port = parsedPort || DEFAULT_SERVE_PORT;
+    try {
+      const { startServer } = await import("./lib/server.mjs");
+      await startServer(rootPath, port);
+    } catch (err) {
+      log.error(err.message);
+      process.exit(1);
+    }
+    return;
   }
 
   let resolvedMode = mode;
@@ -105,35 +159,41 @@ async function main() {
   }
 
   try {
-    if (command === 'setup') {
+    if (command === "setup") {
       runSetup(resolvedMode);
       return;
     }
 
     const targetDir = resolveTargetDir(resolvedMode);
-    const runnerPath = path.join(targetDir, 'hooks', 'cursor-memory-archive.mjs');
+    const runnerPath = path.join(
+      targetDir,
+      "hooks",
+      "cursor-memory-archive.mjs",
+    );
     if (!fs.existsSync(runnerPath)) {
-      throw new Error(`Archive runner not found at ${runnerPath}. Run setup first.`);
+      throw new Error(
+        `Archive runner not found at ${runnerPath}. Run setup first.`,
+      );
     }
 
     const args = [
       runnerPath,
-      '--project-root',
+      "--project-root",
       process.cwd(),
-      '--cursor-dir',
-      targetDir
+      "--cursor-dir",
+      targetDir,
     ];
-    if (dryRun) args.push('--dry-run');
+    if (dryRun) args.push("--dry-run");
     if (Number.isFinite(threshold)) {
-      args.push('--threshold', String(threshold));
+      args.push("--threshold", String(threshold));
     }
     if (Number.isFinite(limit)) {
-      args.push('--limit', String(limit));
+      args.push("--limit", String(limit));
     }
 
-    const result = spawnSync('node', args, { stdio: 'inherit' });
+    const result = spawnSync("node", args, { stdio: "inherit" });
     if (result.status !== 0) {
-      throw new Error('Archive command failed.');
+      throw new Error("Archive command failed.");
     }
   } catch (err) {
     log.error(err.message);

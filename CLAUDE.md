@@ -22,13 +22,17 @@ cursor-memory-cli/
 │   ├── copy.mjs        # 文件/目录复制工具
 │   ├── hooks.mjs       # hooks.json 读取、合并、写入
 │   ├── logger.mjs      # 彩色日志输出
+│   ├── scanner.mjs     # 目录扫描、文件索引、搜索
+│   ├── server.mjs      # HTTP 服务器与 API 路由
 │   ├── setup.mjs       # 安装流程主逻辑
 │   └── ui.mjs          # 交互式选择菜单
 └── templates/          # 安装模板文件
     ├── hooks.json
     ├── hooks/cursor-memory-reminder.sh
     ├── skills/cursor-memory/
-    └── commands/catch-memory.md
+    ├── commands/catch-memory.md
+    └── serve/
+        └── index.html  # 记忆预览前端 SPA
 ```
 
 ## 开发规范
@@ -42,15 +46,17 @@ cursor-memory-cli/
 
 ### 模块职责
 
-| 模块            | 职责                         |
-| --------------- | ---------------------------- |
-| `index.mjs`     | CLI 入口、参数解析、命令路由 |
-| `setup.mjs`     | 安装流程编排                 |
-| `hooks.mjs`     | hooks.json 配置合并逻辑      |
-| `copy.mjs`      | 文件系统操作封装             |
-| `constants.mjs` | 路径解析和常量定义           |
-| `logger.mjs`    | 终端彩色日志                 |
-| `ui.mjs`        | 交互式用户界面               |
+| 模块            | 职责                                     |
+| --------------- | ---------------------------------------- |
+| `index.mjs`     | CLI 入口、参数解析、命令路由             |
+| `setup.mjs`     | 安装流程编排                             |
+| `hooks.mjs`     | hooks.json 配置合并逻辑                  |
+| `copy.mjs`      | 文件系统操作封装                         |
+| `constants.mjs` | 路径解析和常量定义                       |
+| `logger.mjs`    | 终端彩色日志                             |
+| `scanner.mjs`   | memories 目录扫描、opaque ID 索引、搜索  |
+| `server.mjs`    | HTTP 服务器（127.0.0.1）、API 路由       |
+| `ui.mjs`        | 交互式用户界面                           |
 
 ### 错误处理
 
@@ -66,6 +72,10 @@ node index.mjs setup --global
 
 # 运行 CLI（本地安装）
 node index.mjs setup --local
+
+# 启动记忆预览服务器
+node index.mjs serve ~/projects
+node index.mjs serve --port 8080 ~/projects
 
 # 查看帮助
 node index.mjs --help

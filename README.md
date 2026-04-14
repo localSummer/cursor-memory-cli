@@ -14,6 +14,7 @@
 - [记忆类型](#记忆类型)
 - [存储结构](#存储结构)
 - [配置说明](#配置说明)
+- [记忆预览](#记忆预览)
 - [常见问题](#常见问题)
 
 ## 概述
@@ -242,6 +243,29 @@ Skill 会自主完成记忆的分析、提取和存储到 `./memories/` 目录�
 - 需要分析历史会话文件
 - 调试记忆提取功能
 
+### 记忆预览
+
+启动本地预览服务器，在浏览器中可视化浏览和搜索记忆文件：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs serve ~/projects
+```
+
+自定义端口：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs serve --port 8080 ~/projects
+```
+
+预览服务提供：
+
+- **目录树导航**：左侧按项目 > 日期分组展示所有 memories 文件，支持展开收起
+- **富格式展示**：将 JSON 记忆转为卡片式可视化（类型标签、置信度进度条、实体标签等）
+- **全局搜索**：跨项目搜索记忆标题和内容，结果高亮显示
+- **归档与聚合**：同时展示活跃记忆、归档文件和月度聚合统计
+
+服务仅绑定 `127.0.0.1`（本地访问），不暴露到局域网。
+
 ### 归档（手动触发）
 
 如果需要手动执行归档（例如调试或预览），可以运行：
@@ -424,7 +448,11 @@ A: 会被移动到 `./memories/.quarantine/`，同时记录在 `./memories/archi
 
 ### Q: 如何查看提取的记忆？
 
-A: 直接查看 `./memories/YYYY-MM-DD/` 目录下的 JSON 文件。
+A: 可以直接查看 `./memories/YYYY-MM-DD/` 目录下的 JSON 文件，或使用 `serve` 命令启动预览服务器在浏览器中可视化浏览：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs serve ~/projects
+```
 
 ### Q: 可以禁用自动记忆提取吗？
 
@@ -449,6 +477,7 @@ Usage: node cli/cursor-memory-cli/index.mjs <command> [options]
 Commands:
   setup     Install cursor-memory components
   archive   Run memory archive manually
+  serve     Start memory preview server
 
 Options:
   --global    Install to ~/.cursor/ (user-level)
@@ -456,6 +485,7 @@ Options:
   --dry-run   Preview archive without moving files (archive command)
   --threshold <days>  Override retention days (archive command)
   --limit <n>  Override max files per run (archive command)
+  --port <n>  Server port (default: 3000, serve command only)
   --help      Show help message
 ```
 
@@ -469,6 +499,8 @@ cursor-memory-cli/
 │   ├── copy.mjs        # 文件复制工具
 │   ├── hooks.mjs       # hooks.json 合并逻辑
 │   ├── logger.mjs      # 日志输出
+│   ├── scanner.mjs     # 目录扫描、文件索引、搜索
+│   ├── server.mjs      # HTTP 服务器与 API 路由
 │   ├── setup.mjs       # 安装流程
 │   └── ui.mjs          # 交互式 UI
 └── templates/
@@ -484,8 +516,10 @@ cursor-memory-cli/
     │       └── references/
     │           ├── TYPES.md
     │           └── STORAGE.md
-    └── commands/
-        └── catch-memory.md   # 命令定义
+    ├── commands/
+    │   └── catch-memory.md     # 命令定义
+    └── serve/
+        └── index.html          # 记忆预览前端 SPA
 ```
 
 ## License
