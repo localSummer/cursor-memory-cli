@@ -69,8 +69,8 @@ To ensure all memories from a single session are stored together:
     - When writing, check if the file exists.
     - If it exists, read existing memories.
     - **Deduplicate**:
-        - Key: `(type, title)`
-        - If Key matches AND Jaccard Similarity > 0.85:
-            - Keep the version with higher `confidence_score`.
+      - Key: `(type, title)`
+      - If Key matches AND Jaccard Similarity > 0.85:
+        - Keep the version with higher `confidence_score`.
     - Update `last_updated` and increment `extraction_count`.
     - Write back the merged list.
