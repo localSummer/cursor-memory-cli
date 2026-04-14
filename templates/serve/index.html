@@ -627,6 +627,25 @@
         box-shadow: var(--shadow-soft);
       }
 
+      .document-header-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .document-header-main {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .document-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+      }
+
       .session-id {
         font-size: clamp(20px, 3vw, 28px);
         font-weight: 700;
@@ -658,6 +677,19 @@
         border-radius: 999px;
         border: 1px solid var(--line-soft);
         background: var(--bg-elevated);
+      }
+
+      .btn-inline {
+        min-height: 34px;
+        padding: 0 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .btn-copy.copied {
+        color: var(--accent-strong);
+        border-color: var(--accent-dim);
+        background: var(--accent-contrast);
       }
 
       .aggregate-stats {
@@ -1210,12 +1242,18 @@
       const state = {
         tree: null,
         activeFileId: null,
+        activeShareKey: null,
+        fileIndexById: new Map(),
+        fileIndexByShareKey: new Map(),
         searchMode: false,
         searchAbort: null,
+        activeRequestToken: 0,
+        shareFeedbackTimer: null,
         theme: null,
       };
 
       const THEME_STORAGE_KEY = "cursor-memory-theme";
+      const SHARE_QUERY_PARAM = "share";
       const THEME_ICONS = {
         light: `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1418,6 +1456,261 @@
         container.appendChild(section);
       }
 
+      function buildTreeIndexes(projects) {
+        const byId = new Map();
+        const byShareKey = new Map();
+        const priority = {
+          session: 3,
+          "archived-session": 2,
+          aggregate: 1,
+        };
+
+        function remember(item) {
+          byId.set(item.id, item);
+          if (!item.shareKey) return;
+          const current = byShareKey.get(item.shareKey);
+          if (!current || priority[item.kind] > priority[current.kind]) {
+            byShareKey.set(item.shareKey, item);
+          }
+        }
+
+        for (const project of projects || []) {
+          for (const group of project.memories || []) {
+            for (const file of group.files || []) {
+              remember({
+                id: file.id,
+                shareKey: file.shareKey || null,
+                kind: file.kind,
+                projectId: project.projectId,
+              });
+            }
+          }
+          for (const group of project.archive || []) {
+            for (const file of group.files || []) {
+              remember({
+                id: file.id,
+                shareKey: file.shareKey || null,
+                kind: file.kind,
+                projectId: project.projectId,
+              });
+            }
+          }
+          for (const agg of project.aggregates || []) {
+            remember({
+              id: agg.id,
+              shareKey: agg.shareKey || null,
+              kind: agg.kind,
+              projectId: project.projectId,
+            });
+          }
+        }
+
+        state.fileIndexById = byId;
+        state.fileIndexByShareKey = byShareKey;
+      }
+
+      function getTreeEntryByFileId(fileId) {
+        return state.fileIndexById.get(Number(fileId)) || null;
+      }
+
+      function getTreeEntryByShareKey(shareKey) {
+        if (!shareKey) return null;
+        return state.fileIndexByShareKey.get(shareKey) || null;
+      }
+
+      function getShareKeyFromUrl() {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(SHARE_QUERY_PARAM);
+      }
+
+      function buildShareUrl(shareKey) {
+        const url = new URL(window.location.href);
+        if (shareKey) {
+          url.searchParams.set(SHARE_QUERY_PARAM, shareKey);
+        } else {
+          url.searchParams.delete(SHARE_QUERY_PARAM);
+        }
+        return url.toString();
+      }
+
+      function updateUrlForShareKey(shareKey, mode = "none") {
+        if (mode === "none") return;
+        const nextUrl = buildShareUrl(shareKey);
+        if (nextUrl === window.location.href) return;
+        const method = mode === "push" ? "pushState" : "replaceState";
+        window.history[method]({}, "", nextUrl);
+      }
+
+      function invalidateActiveRequest() {
+        state.activeRequestToken += 1;
+        return state.activeRequestToken;
+      }
+
+      function renderContentNode(node) {
+        const content = document.getElementById("content");
+        content.innerHTML = "";
+        content.appendChild(node);
+      }
+
+      function clearActiveSelection() {
+        state.activeFileId = null;
+        state.activeShareKey = null;
+        updateActiveHighlight();
+      }
+
+      function setButtonText(button, text) {
+        button.textContent = "";
+        txt(button, text);
+      }
+
+      async function copyShareLink(shareKey, button) {
+        const shareUrl = buildShareUrl(shareKey);
+        const defaultLabel = button.dataset.defaultLabel || "Copy Link";
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(shareUrl);
+            button.classList.add("copied");
+            setButtonText(button, "Copied");
+            if (state.shareFeedbackTimer) {
+              clearTimeout(state.shareFeedbackTimer);
+            }
+            state.shareFeedbackTimer = window.setTimeout(() => {
+              button.classList.remove("copied");
+              setButtonText(button, defaultLabel);
+              state.shareFeedbackTimer = null;
+            }, 1400);
+            return;
+          }
+        } catch (_) {}
+
+        window.prompt("Copy this link", shareUrl);
+      }
+
+      function createCopyLinkButton(shareKey) {
+        if (!shareKey) return null;
+        const button = el("button", "btn btn-inline btn-copy", "Copy Link");
+        button.type = "button";
+        button.dataset.defaultLabel = "Copy Link";
+        button.title = "Copy share link";
+        button.addEventListener("click", async () => {
+          await copyShareLink(shareKey, button);
+        });
+        return button;
+      }
+
+      function createDocumentHeader({
+        className,
+        title,
+        metaItems,
+        shareKey,
+      }) {
+        const header = el("div", className);
+        const top = el("div", "document-header-top");
+        const main = el("div", "document-header-main");
+        main.appendChild(el("div", "session-id", title));
+        top.appendChild(main);
+
+        const copyBtn = createCopyLinkButton(shareKey);
+        if (copyBtn) {
+          const actions = el("div", "document-header-actions");
+          actions.appendChild(copyBtn);
+          top.appendChild(actions);
+        }
+        header.appendChild(top);
+
+        const meta = el("div", "session-meta");
+        for (const item of metaItems || []) {
+          if (item) meta.appendChild(el("span", "meta-chip", item));
+        }
+        if (meta.childNodes.length > 0) {
+          header.appendChild(meta);
+        }
+        return header;
+      }
+
+      function openTreeAncestor(node) {
+        if (!node) return;
+        node.classList.add("open");
+        if (node.classList.contains("tree-group-children")) {
+          syncGroupChildrenInteractivity(node, true);
+          const label = node.previousElementSibling;
+          if (label && label.classList.contains("tree-group-label")) {
+            setExpandedState(label, true);
+            const arrow = label.querySelector(".tree-arrow");
+            if (arrow) arrow.classList.add("open");
+          }
+          return;
+        }
+        if (node.classList.contains("tree-children")) {
+          syncProjectChildrenInteractivity(node, true);
+          const header = node.previousElementSibling;
+          if (header && header.classList.contains("tree-project-header")) {
+            setExpandedState(header, true);
+            const arrow = header.querySelector(".tree-arrow");
+            if (arrow) arrow.classList.add("open");
+          }
+        }
+      }
+
+      function expandAncestorsForFile(fileId) {
+        const fileEl = document.querySelector(
+          `.tree-file[data-file-id="${fileId}"]`,
+        );
+        if (!fileEl) return;
+        let current = fileEl.parentElement;
+        const sidebar = document.getElementById("sidebar");
+        while (current && current !== sidebar) {
+          if (
+            current.classList.contains("tree-group-children") ||
+            current.classList.contains("tree-children")
+          ) {
+            openTreeAncestor(current);
+          }
+          current = current.parentElement;
+        }
+      }
+
+      function renderSharedNotFoundState(shareKey) {
+        invalidateActiveRequest();
+        clearActiveSelection();
+        renderContentNode(
+          renderInfoState({
+            eyebrow: "Shared Link",
+            title: "Shared memory not found",
+            description:
+              "The shared memory could not be resolved in the current root. Refresh the tree or open another memory from the sidebar.",
+            tips: shareKey
+              ? [`Share key: ${shareKey}`, "Use Refresh to rescan this root"]
+              : ["Use Refresh to rescan this root"],
+          }),
+        );
+      }
+
+      async function restoreFromLocation({
+        source = "url-init",
+        historyMode = "replace",
+      } = {}) {
+        const shareKey = getShareKeyFromUrl();
+        if (!shareKey) {
+          invalidateActiveRequest();
+          clearActiveSelection();
+          renderContentNode(renderEmptyState("Select a memory file to preview"));
+          return;
+        }
+
+        const entry = getTreeEntryByShareKey(shareKey);
+        if (!entry) {
+          renderSharedNotFoundState(shareKey);
+          return;
+        }
+
+        await loadFile(entry.id, {
+          historyMode,
+          source,
+          shareKey,
+        });
+      }
+
       function getPreferredTheme() {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
         if (stored === "light" || stored === "dark") return stored;
@@ -1520,9 +1813,19 @@
             for (const agg of project.aggregates) {
               const fileEl = el("div", "tree-file", agg.name);
               fileEl.dataset.fileId = agg.id;
-              makeInteractive(fileEl, () => loadFile(agg.id), {
-                enabled: false,
-              });
+              fileEl.dataset.shareKey = agg.shareKey || "";
+              makeInteractive(
+                fileEl,
+                () =>
+                  loadFile(agg.id, {
+                    historyMode: "push",
+                    source: "tree",
+                    shareKey: agg.shareKey || null,
+                  }),
+                {
+                  enabled: false,
+                },
+              );
               children.appendChild(fileEl);
             }
           }
@@ -1571,9 +1874,19 @@
           txt(fileEl, name || file.name);
           fileEl.title = file.name;
           fileEl.dataset.fileId = file.id;
-          makeInteractive(fileEl, () => loadFile(file.id), {
-            enabled: false,
-          });
+          fileEl.dataset.shareKey = file.shareKey || "";
+          makeInteractive(
+            fileEl,
+            () =>
+              loadFile(file.id, {
+                historyMode: "push",
+                source: "tree",
+                shareKey: file.shareKey || null,
+              }),
+            {
+              enabled: false,
+            },
+          );
           childrenEl.appendChild(fileEl);
         }
         parent.appendChild(childrenEl);
@@ -1605,9 +1918,19 @@
           );
           fileEl.title = file.name;
           fileEl.dataset.fileId = file.id;
-          makeInteractive(fileEl, () => loadFile(file.id), {
-            enabled: false,
-          });
+          fileEl.dataset.shareKey = file.shareKey || "";
+          makeInteractive(
+            fileEl,
+            () =>
+              loadFile(file.id, {
+                historyMode: "push",
+                source: "tree",
+                shareKey: file.shareKey || null,
+              }),
+            {
+              enabled: false,
+            },
+          );
           childrenEl.appendChild(fileEl);
         }
         parent.appendChild(childrenEl);
@@ -1625,9 +1948,24 @@
       /* ============================================================
    File loading & Memory rendering
    ============================================================ */
-      async function loadFile(fileId) {
-        exitSearchMode();
+      async function loadFile(fileId, options = {}) {
+        const {
+          historyMode = "push",
+          shareKey: providedShareKey = null,
+        } = options;
+        if (state.searchMode) {
+          exitSearchMode();
+        }
+        const requestToken = invalidateActiveRequest();
+        const treeEntry = getTreeEntryByFileId(fileId);
+        const resolvedShareKey =
+          providedShareKey || treeEntry?.shareKey || state.activeShareKey;
         state.activeFileId = fileId;
+        state.activeShareKey = resolvedShareKey;
+        if (resolvedShareKey) {
+          updateUrlForShareKey(resolvedShareKey, historyMode);
+        }
+        expandAncestorsForFile(fileId);
         updateActiveHighlight();
 
         const content = document.getElementById("content");
@@ -1639,6 +1977,14 @@
 
         try {
           const doc = await apiGet(`/api/memory/${fileId}`);
+          if (requestToken !== state.activeRequestToken) return;
+          if (doc.shareKey) {
+            state.activeShareKey = doc.shareKey;
+            updateUrlForShareKey(
+              doc.shareKey,
+              historyMode === "push" ? "replace" : historyMode,
+            );
+          }
           content.innerHTML = "";
           if (doc.kind === "aggregate") {
             renderAggregate(content, doc);
@@ -1655,6 +2001,7 @@
             renderSession(content, doc);
           }
         } catch (err) {
+          if (requestToken !== state.activeRequestToken) return;
           content.innerHTML = "";
           content.appendChild(
             renderInfoState({
@@ -1668,27 +2015,18 @@
       }
 
       function renderSession(container, doc) {
-        const header = el("div", "session-header");
-        header.appendChild(
-          el("div", "session-id", doc.session_id || "Unknown Session"),
-        );
-        const meta = el("div", "session-meta");
-        if (doc.timestamp) meta.appendChild(el("span", "meta-chip", doc.timestamp));
-        if (doc.last_updated) {
-          meta.appendChild(
-            el("span", "meta-chip", `Updated ${doc.last_updated}`),
-          );
-        }
-        if (doc.extraction_count) {
-          meta.appendChild(
-            el(
-              "span",
-              "meta-chip",
-              `Extraction #${formatNumber(doc.extraction_count)}`,
-            ),
-          );
-        }
-        header.appendChild(meta);
+        const header = createDocumentHeader({
+          className: "session-header",
+          title: doc.session_id || "Unknown Session",
+          metaItems: [
+            doc.timestamp || null,
+            doc.last_updated ? `Updated ${doc.last_updated}` : null,
+            doc.extraction_count
+              ? `Extraction #${formatNumber(doc.extraction_count)}`
+              : null,
+          ],
+          shareKey: doc.shareKey || state.activeShareKey,
+        });
         container.appendChild(header);
 
         const memories = Array.isArray(doc.memories) ? doc.memories : [];
@@ -1703,17 +2041,14 @@
       }
 
       function renderAggregate(container, doc) {
-        const header = el("div", "aggregate-header");
-        header.appendChild(
-          el("div", "session-id", `Aggregate: ${doc.month || "Unknown"}`),
-        );
-        const meta = el("div", "session-meta");
-        if (doc.generated_at) {
-          meta.appendChild(
-            el("span", "meta-chip", `Generated ${doc.generated_at}`),
-          );
-        }
-        header.appendChild(meta);
+        const header = createDocumentHeader({
+          className: "aggregate-header",
+          title: `Aggregate: ${doc.month || "Unknown"}`,
+          metaItems: [
+            doc.generated_at ? `Generated ${doc.generated_at}` : null,
+          ],
+          shareKey: doc.shareKey || state.activeShareKey,
+        });
 
         if (doc.stats) {
           const statsRow = el("div", "aggregate-stats");
@@ -1932,6 +2267,15 @@
           const q = input.value.trim();
           if (!q) {
             exitSearchMode();
+            if (state.activeFileId != null) {
+              loadFile(state.activeFileId, {
+                historyMode: "none",
+                source: "search-exit",
+                shareKey: state.activeShareKey,
+              });
+            } else {
+              renderContentNode(renderEmptyState("Select a memory file to preview"));
+            }
             return;
           }
           searchTimer = setTimeout(() => doSearch(q), 300);
@@ -1941,6 +2285,15 @@
           if (e.key === "Escape") {
             input.value = "";
             exitSearchMode();
+            if (state.activeFileId != null) {
+              loadFile(state.activeFileId, {
+                historyMode: "none",
+                source: "search-exit",
+                shareKey: state.activeShareKey,
+              });
+            } else {
+              renderContentNode(renderEmptyState("Select a memory file to preview"));
+            }
           }
         });
       }
@@ -1950,6 +2303,7 @@
         if (state.searchAbort) state.searchAbort.abort();
         const controller = new AbortController();
         state.searchAbort = controller;
+        invalidateActiveRequest();
 
         state.searchMode = true;
         const content = document.getElementById("content");
@@ -2008,7 +2362,12 @@
             hitEl.appendChild(snippetEl);
 
             makeInteractive(hitEl, () => {
-              loadFile(hit.fileId).then(() => {
+              const shareKey = getTreeEntryByFileId(hit.fileId)?.shareKey || null;
+              loadFile(hit.fileId, {
+                historyMode: "push",
+                source: "search",
+                shareKey,
+              }).then(() => {
                 const target = document.getElementById(
                   `memory-${hit.memoryIndex}`,
                 );
@@ -2062,18 +2421,11 @@
       function exitSearchMode() {
         if (!state.searchMode) return;
         state.searchMode = false;
+        const input = document.getElementById("searchInput");
+        if (input) input.value = "";
         if (state.searchAbort) {
           state.searchAbort.abort();
           state.searchAbort = null;
-        }
-        const content = document.getElementById("content");
-        if (state.activeFileId) {
-          loadFile(state.activeFileId);
-        } else {
-          content.innerHTML = "";
-          content.appendChild(
-            renderEmptyState("Select a memory file to preview"),
-          );
         }
       }
 
@@ -2082,10 +2434,14 @@
           .querySelectorAll(".tree-file.active")
           .forEach((e) => e.classList.remove("active"));
         if (state.activeFileId != null) {
+          expandAncestorsForFile(state.activeFileId);
           const active = document.querySelector(
             `.tree-file[data-file-id="${state.activeFileId}"]`,
           );
-          if (active) active.classList.add("active");
+          if (active) {
+            active.classList.add("active");
+            active.scrollIntoView({ block: "nearest" });
+          }
         }
       }
 
@@ -2096,17 +2452,24 @@
         setupThemeToggle();
         setupSearch();
 
+        window.addEventListener("popstate", async () => {
+          await restoreFromLocation({
+            source: "popstate",
+            historyMode: "none",
+          });
+        });
+
         document
           .getElementById("refreshBtn")
           .addEventListener("click", async () => {
+            invalidateActiveRequest();
             await apiPost("/api/refresh");
             state.tree = null;
-            state.activeFileId = null;
             await loadTree();
-            document.getElementById("content").innerHTML = "";
-            document
-              .getElementById("content")
-              .appendChild(renderEmptyState("Select a memory file to preview"));
+            await restoreFromLocation({
+              source: "refresh-restore",
+              historyMode: "replace",
+            });
           });
 
         const initialEmpty = document.getElementById("initialEmptyState");
@@ -2117,10 +2480,16 @@
         }
 
         await loadTree();
+        await restoreFromLocation({
+          source: "url-init",
+          historyMode: "replace",
+        });
       }
 
       async function loadTree() {
         const sidebar = document.getElementById("sidebar");
+        state.fileIndexById = new Map();
+        state.fileIndexByShareKey = new Map();
         sidebar.innerHTML = "";
         const loading = el("div", "content-loading");
         loading.appendChild(el("div", "spinner"));
@@ -2130,6 +2499,7 @@
         try {
           const data = await apiGet("/api/tree");
           state.tree = data.projects;
+          buildTreeIndexes(data.projects);
           renderTree(data.projects);
         } catch (err) {
           sidebar.innerHTML = "";
