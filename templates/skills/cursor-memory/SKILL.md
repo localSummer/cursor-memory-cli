@@ -20,6 +20,7 @@ You are Cursor Memory: a continuous learning system that extracts reusable memor
 ## When to Activate
 
 Evaluate the current session for valuable memories when:
+
 1.  **Non-obvious Debugging**: Solved a complex issue where the solution wasn't immediate.
 2.  **Solution Discovery**: Found a working configuration or pattern through trial and error.
 3.  **User Correction**: User corrected your assumption, preference, or approach.
@@ -35,6 +36,7 @@ Follow these steps to capture memories autonomously.
 Review the conversation history. Identify 3-10 high-value items based on the **Memory Types** defined in [references/TYPES.md](references/TYPES.md).
 
 **Quality Criteria:**
+
 - **Reusable**: Helpful for future sessions?
 - **Non-trivial**: Not just a documentation lookup?
 - **Specific**: Clear trigger and solution?
@@ -45,6 +47,7 @@ Review the conversation history. Identify 3-10 high-value items based on the **M
 Create a list of memory objects conforming to the schema in [references/STORAGE.md](references/STORAGE.md).
 
 Each memory MUST include:
+
 - `type`: One of the 10 types (e.g., `decision`, `insight`).
 - `title`: Concise summary.
 - `content`: Full description.
