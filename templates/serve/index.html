@@ -740,6 +740,19 @@
         box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12);
       }
 
+      .category-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line-soft);
+        background: var(--bg-elevated);
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
       .card-title {
         flex: 1;
         min-width: 220px;
@@ -767,6 +780,32 @@
         color: var(--text-secondary);
         font-size: 13px;
         font-style: normal;
+      }
+
+      .card-detail {
+        margin-bottom: 14px;
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line-soft);
+        background: var(--bg-elevated);
+      }
+
+      .card-detail-label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+      }
+
+      .card-detail-value {
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       .confidence-row {
@@ -804,6 +843,14 @@
         flex-wrap: wrap;
         gap: 8px;
         margin-bottom: 12px;
+      }
+
+      .card-tag-group {
+        margin-bottom: 12px;
+      }
+
+      .card-tag-group .card-detail-label {
+        margin-bottom: 8px;
       }
 
       .entity-tag {
@@ -905,6 +952,56 @@
 
       .source-chunk .msg-assistant {
         color: var(--type-insight);
+      }
+
+      .suggestions-section {
+        margin-top: 28px;
+      }
+
+      .suggestions-title {
+        margin-bottom: 14px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .suggestion-card {
+        margin-bottom: 12px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-card-strong) 100%);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .suggestion-card:last-child {
+        margin-bottom: 0;
+      }
+
+      .suggestion-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      .suggestion-message {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .suggestion-context {
+        margin-top: 10px;
+        color: var(--text-muted);
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
       }
 
       .search-results-header {
@@ -1255,6 +1352,72 @@
         return wrapper;
       }
 
+      function renderTagGroup(labelText, values) {
+        if (!Array.isArray(values) || values.length === 0) return null;
+        const group = el("div", "card-tag-group");
+        group.appendChild(el("div", "card-detail-label", labelText));
+        const tags = el("div", "card-tags");
+        for (const value of values) {
+          tags.appendChild(el("span", "entity-tag", value));
+        }
+        group.appendChild(tags);
+        return group;
+      }
+
+      function renderDetailBlock(labelText, value) {
+        if (value === undefined || value === null || value === "") return null;
+        const block = el("div", "card-detail");
+        block.appendChild(el("div", "card-detail-label", labelText));
+        block.appendChild(el("div", "card-detail-value", String(value)));
+        return block;
+      }
+
+      function serializeSuggestion(value) {
+        if (typeof value === "string") return value;
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch {
+          return String(value);
+        }
+      }
+
+      function renderSuggestions(container, suggestions) {
+        if (!Array.isArray(suggestions) || suggestions.length === 0) return;
+        const section = el("section", "suggestions-section");
+        section.appendChild(el("h2", "suggestions-title", "Suggestions"));
+
+        for (const item of suggestions) {
+          const card = el("article", "suggestion-card");
+
+          if (item && typeof item === "object" && !Array.isArray(item)) {
+            const header = el("div", "suggestion-header");
+            if (item.type) header.appendChild(el("span", "meta-chip", String(item.type)));
+            if (item.severity) {
+              header.appendChild(el("span", "meta-chip", String(item.severity)));
+            }
+            if (header.childNodes.length > 0) {
+              card.appendChild(header);
+            }
+
+            const message =
+              item.message ?? item.content ?? item.title ?? serializeSuggestion(item);
+            card.appendChild(el("div", "suggestion-message", message));
+
+            if (item.context) {
+              card.appendChild(el("div", "suggestion-context", String(item.context)));
+            }
+          } else {
+            card.appendChild(
+              el("div", "suggestion-message", serializeSuggestion(item)),
+            );
+          }
+
+          section.appendChild(card);
+        }
+
+        container.appendChild(section);
+      }
+
       function getPreferredTheme() {
         const stored = localStorage.getItem(THEME_STORAGE_KEY);
         if (stored === "light" || stored === "dark") return stored;
@@ -1511,6 +1674,11 @@
         );
         const meta = el("div", "session-meta");
         if (doc.timestamp) meta.appendChild(el("span", "meta-chip", doc.timestamp));
+        if (doc.last_updated) {
+          meta.appendChild(
+            el("span", "meta-chip", `Updated ${doc.last_updated}`),
+          );
+        }
         if (doc.extraction_count) {
           meta.appendChild(
             el(
@@ -1530,6 +1698,8 @@
           card.id = `memory-${i}`;
           container.appendChild(card);
         }
+
+        renderSuggestions(container, doc.suggestions);
       }
 
       function renderAggregate(container, doc) {
@@ -1598,6 +1768,9 @@
         badge.style.background = color;
         badge.style.color = "#fff";
         top.appendChild(badge);
+        if (mem.category) {
+          top.appendChild(el("span", "category-badge", mem.category));
+        }
         top.appendChild(
           el("span", "card-title", mem.title || `Memory ${index + 1}`),
         );
@@ -1609,6 +1782,11 @@
 
         if (mem.reasoning) {
           card.appendChild(el("div", "card-reasoning", mem.reasoning));
+        }
+
+        if (mem.type === "decision" && mem.selected_option) {
+          const selected = renderDetailBlock("Selected", mem.selected_option);
+          if (selected) card.appendChild(selected);
         }
 
         if (typeof mem.confidence_score === "number") {
@@ -1639,27 +1817,27 @@
           Array.isArray(mem.related_entities) &&
           mem.related_entities.length > 0
         ) {
-          const tags = el("div", "card-tags");
-          for (const ent of mem.related_entities) {
-            const tag = el(
-              "span",
-              "entity-tag",
-              `${ent.type}: ${ent.raw || ent.slug || ""}`,
-            );
-            tags.appendChild(tag);
-          }
-          card.appendChild(tags);
+          const entities = mem.related_entities.map(
+            (ent) => `${ent.type}: ${ent.raw || ent.slug || ""}`,
+          );
+          const tags = renderTagGroup("Related entities", entities);
+          if (tags) card.appendChild(tags);
         }
 
         if (
           Array.isArray(mem.tools_mentioned) &&
           mem.tools_mentioned.length > 0
         ) {
-          const tags = el("div", "card-tags");
-          for (const tool of mem.tools_mentioned) {
-            tags.appendChild(el("span", "entity-tag", tool));
-          }
-          card.appendChild(tags);
+          const tags = renderTagGroup("Tools", mem.tools_mentioned);
+          if (tags) card.appendChild(tags);
+        }
+
+        if (
+          Array.isArray(mem.target_agents) &&
+          mem.target_agents.length > 0
+        ) {
+          const tags = renderTagGroup("Target agents", mem.target_agents);
+          if (tags) card.appendChild(tags);
         }
 
         if (
@@ -1684,7 +1862,11 @@
           card.appendChild(urlDiv);
         }
 
-        if (Array.isArray(mem.alternatives) && mem.alternatives.length > 0) {
+        if (
+          mem.type === "decision" &&
+          Array.isArray(mem.alternatives) &&
+          mem.alternatives.length > 0
+        ) {
           const dl = el("dl", "card-alternatives");
           for (const alt of mem.alternatives) {
             const dt = el("dt", "", alt.option || "");
