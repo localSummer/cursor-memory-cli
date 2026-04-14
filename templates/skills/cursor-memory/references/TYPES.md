@@ -2,6 +2,8 @@
 
 This reference defines the standard types used for structured memory extraction.
 
+> **Note**: The examples below are in English for definition clarity. When generating actual memory values, use Chinese as specified in SKILL.md.
+
 ## 10 Memory Types
 
 When extracting memories, classify them into one of these types:

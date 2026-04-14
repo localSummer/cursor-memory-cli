@@ -16,12 +16,12 @@ Memories are stored in JSON files with the following structure:
     {
       "type": "decision|insight|...",
       "category": "technical|workflow|...",
-      "title": "Short summary (max 100 chars)",
-      "content": "Full description of the memory",
+      "title": "简短摘要（最多 100 字符）",
+      "content": "记忆的完整描述",
       "source_chunk": "Original conversation snippet with **User:** and **Assistant:** markers",
-      "reasoning": "Why this is important (optional)",
-      "alternatives": [{"option": "X", "why_not": "Reason"}],
-      "selected_option": "Selected option (for decisions)",
+      "reasoning": "为什么这很重要（可选）",
+      "alternatives": [{"option": "备选方案 X", "why_not": "未选择的原因"}],
+      "selected_option": "选择的方案（用于决策类型）",
       "confidence_score": 50-100,
       "related_entities": [
         {

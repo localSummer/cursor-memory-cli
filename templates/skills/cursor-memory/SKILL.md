@@ -54,6 +54,24 @@ Each memory MUST include:
 - `source_chunk`: Verbatim quote from the conversation supporting this memory.
 - `confidence_score`: 50-100.
 
+#### Output Language: Chinese (中文)
+
+All human-readable JSON field **values** MUST be written in Chinese. JSON field **keys** remain in English.
+
+**Chinese value fields:** `title`, `content`, `reasoning`, `alternatives[].option`, `alternatives[].why_not`, `selected_option`
+
+**Verbatim / programmatic fields (keep as-is):** `type`, `category`, `source_chunk`, `related_entities`, `tools_mentioned`, `target_agents`, `urls_mentioned`
+
+Example:
+
+```json
+{
+  "title": "选择 Vercel 而非 Netlify 进行部署，因为与 Next.js 集成更好",
+  "content": "经过对比 Vercel 和 Netlify 的部署方案，最终选择 Vercel，主要原因是其与 Next.js 的原生集成支持更完善，包括 ISR、Edge Functions 等特性。",
+  "reasoning": "这个决策影响整个部署流程，未来会话中需要记住我们使用 Vercel"
+}
+```
+
 ### Step 3: Storage Operation
 
 Save the memories to the file system using the **Single Session Single File** mechanism described in [references/STORAGE.md](references/STORAGE.md).
