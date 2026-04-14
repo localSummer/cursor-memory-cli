@@ -67,8 +67,7 @@
         }
       }
 
-      :root,
-      html[data-theme="light"] {
+      :root {
         color-scheme: light;
         --bg-primary: #f3f6fb;
         --bg-secondary: rgba(255, 255, 255, 0.82);
@@ -88,6 +87,10 @@
         --accent-strong: #1d4ed8;
         --accent-dim: #3b82f6;
         --accent-contrast: #eff6ff;
+        --json-string: #166534;
+        --json-number: #1d4ed8;
+        --json-boolean: #b45309;
+        --json-null: #64748b;
         --border: rgba(148, 163, 184, 0.28);
         --border-strong: rgba(100, 116, 139, 0.26);
         --line-soft: rgba(148, 163, 184, 0.18);
@@ -107,8 +110,51 @@
           linear-gradient(180deg, #f8fbff 0%, #eef3f9 100%);
       }
 
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --bg-primary: #020617;
+        --bg-secondary: rgba(15, 23, 42, 0.78);
+        --bg-tertiary: #0f172a;
+        --bg-elevated: rgba(15, 23, 42, 0.92);
+        --bg-card: rgba(15, 23, 42, 0.88);
+        --bg-card-strong: #111c31;
+        --bg-sidebar: rgba(9, 14, 26, 0.86);
+        --bg-hover: rgba(96, 165, 250, 0.14);
+        --bg-selected: rgba(37, 99, 235, 0.2);
+        --bg-contrast: rgba(51, 65, 85, 0.45);
+        --text-primary: #e2e8f0;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --text-soft: #64748b;
+        --accent: #38bdf8;
+        --accent-strong: #7dd3fc;
+        --accent-dim: #0ea5e9;
+        --accent-contrast: rgba(56, 189, 248, 0.14);
+        --json-string: #86efac;
+        --json-number: #93c5fd;
+        --json-boolean: #fdba74;
+        --json-null: #94a3b8;
+        --border: rgba(71, 85, 105, 0.48);
+        --border-strong: rgba(100, 116, 139, 0.52);
+        --line-soft: rgba(100, 116, 139, 0.22);
+        --shadow-soft: 0 16px 40px rgba(2, 6, 23, 0.42);
+        --shadow-card: 0 26px 52px rgba(2, 6, 23, 0.5);
+        --page-glow:
+          radial-gradient(
+            circle at top left,
+            rgba(56, 189, 248, 0.12),
+            transparent 30%
+          ),
+          radial-gradient(
+            circle at top right,
+            rgba(34, 197, 94, 0.1),
+            transparent 24%
+          ),
+          linear-gradient(180deg, #020617 0%, #07101f 100%);
+      }
+
       @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme="light"]) {
           color-scheme: dark;
           --bg-primary: #020617;
           --bg-secondary: rgba(15, 23, 42, 0.78);
@@ -128,6 +174,10 @@
           --accent-strong: #7dd3fc;
           --accent-dim: #0ea5e9;
           --accent-contrast: rgba(56, 189, 248, 0.14);
+          --json-string: #86efac;
+          --json-number: #93c5fd;
+          --json-boolean: #fdba74;
+          --json-null: #94a3b8;
           --border: rgba(71, 85, 105, 0.48);
           --border-strong: rgba(100, 116, 139, 0.52);
           --line-soft: rgba(100, 116, 139, 0.22);
@@ -723,6 +773,160 @@
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 12px;
         margin-top: 18px;
+      }
+
+      .raw-json-section {
+        margin-bottom: 18px;
+        padding: 18px 20px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: linear-gradient(
+          180deg,
+          var(--bg-card) 0%,
+          var(--bg-card-strong) 100%
+        );
+        box-shadow: var(--shadow-soft);
+      }
+
+      .raw-json-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .raw-json-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .raw-json-subtitle {
+        margin-top: 4px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--text-muted);
+      }
+
+      .raw-json-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line-soft);
+        background: var(--bg-elevated);
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+
+      .json-tree {
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line-soft);
+        background: var(--bg-elevated);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .json-node,
+      .json-leaf {
+        margin-left: calc(var(--json-depth, 0) * 18px);
+      }
+
+      .json-node-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 28px;
+        padding: 4px 6px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--text-secondary);
+        text-align: left;
+      }
+
+      .json-node-toggle:hover {
+        border-color: var(--line-soft);
+        background: var(--bg-hover);
+      }
+
+      .json-node-toggle:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .json-node-key {
+        color: var(--text-primary);
+        font-weight: 600;
+        word-break: break-word;
+      }
+
+      .json-node-summary {
+        color: var(--text-muted);
+        font-size: 11px;
+      }
+
+      .json-node-children {
+        display: none;
+        margin-top: 2px;
+      }
+
+      .json-node-children.open {
+        display: block;
+      }
+
+      .json-leaf {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-height: 26px;
+        padding: 4px 6px;
+        border-radius: 10px;
+      }
+
+      .json-leaf:hover {
+        background: var(--bg-hover);
+      }
+
+      .json-leaf-label {
+        display: inline-flex;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .json-node-colon {
+        color: var(--text-muted);
+      }
+
+      .json-value {
+        min-width: 0;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .json-value-string {
+        color: var(--json-string);
+      }
+
+      .json-value-number {
+        color: var(--json-number);
+      }
+
+      .json-value-boolean {
+        color: var(--json-boolean);
+      }
+
+      .json-value-null {
+        color: var(--json-null);
+        font-style: italic;
       }
 
       .stat-card {
@@ -1479,6 +1683,148 @@
           return new Intl.NumberFormat("en-US").format(numeric);
         }
         return String(value);
+      }
+
+      function formatJsonSummary(value) {
+        if (Array.isArray(value)) {
+          return `[${formatNumber(value.length)} item${value.length === 1 ? "" : "s"}]`;
+        }
+        const size = Object.keys(value || {}).length;
+        return `{${formatNumber(size)} key${size === 1 ? "" : "s"}}`;
+      }
+
+      function isJsonContainer(value) {
+        return value !== null && typeof value === "object";
+      }
+
+      function createJsonValueNode(value) {
+        const span = el("span", "json-value");
+        if (typeof value === "string") {
+          span.classList.add("json-value-string");
+          txt(span, JSON.stringify(value));
+          return span;
+        }
+        if (typeof value === "number") {
+          span.classList.add("json-value-number");
+          txt(span, String(value));
+          return span;
+        }
+        if (typeof value === "boolean") {
+          span.classList.add("json-value-boolean");
+          txt(span, value ? "true" : "false");
+          return span;
+        }
+        if (value === null) {
+          span.classList.add("json-value-null");
+          txt(span, "null");
+          return span;
+        }
+        txt(span, JSON.stringify(value));
+        return span;
+      }
+
+      function createJsonLeaf(key, value, depth) {
+        const row = el("div", "json-leaf");
+        row.style.setProperty("--json-depth", depth);
+        const label = el("div", "json-leaf-label");
+        label.appendChild(el("span", "json-node-key", key));
+        label.appendChild(el("span", "json-node-colon", ":"));
+        label.appendChild(createJsonValueNode(value));
+        row.appendChild(label);
+        return row;
+      }
+
+      function createJsonNode(key, value, depth, { expanded = false } = {}) {
+        if (!isJsonContainer(value)) {
+          return createJsonLeaf(key, value, depth);
+        }
+
+        const entries = Array.isArray(value)
+          ? value.map((item, index) => [String(index), item])
+          : Object.entries(value);
+
+        if (entries.length === 0) {
+          return createJsonLeaf(
+            key,
+            Array.isArray(value) ? [] : {},
+            depth,
+          );
+        }
+
+        const wrapper = el("div", "json-node");
+        wrapper.style.setProperty("--json-depth", depth);
+        const toggle = el("button", "json-node-toggle");
+        toggle.type = "button";
+        setExpandedState(toggle, expanded);
+
+        const arrow = el("span", "tree-arrow", "\u25B6");
+        arrow.classList.toggle("open", expanded);
+        toggle.appendChild(arrow);
+        toggle.appendChild(el("span", "json-node-key", key));
+        toggle.appendChild(el("span", "json-node-summary", formatJsonSummary(value)));
+        wrapper.appendChild(toggle);
+
+        const children = el("div", "json-node-children");
+        children.classList.toggle("open", expanded);
+        for (const [childKey, childValue] of entries) {
+          children.appendChild(
+            createJsonNode(childKey, childValue, depth + 1, {
+              expanded: false,
+            }),
+          );
+        }
+        wrapper.appendChild(children);
+
+        toggle.addEventListener("click", () => {
+          const isOpen = !children.classList.contains("open");
+          children.classList.toggle("open", isOpen);
+          arrow.classList.toggle("open", isOpen);
+          setExpandedState(toggle, isOpen);
+        });
+
+        return wrapper;
+      }
+
+      function toRawDocumentPayload(doc) {
+        const payload = {};
+        for (const [key, value] of Object.entries(doc || {})) {
+          if (key === "kind" || key === "shareKey") continue;
+          payload[key] = value;
+        }
+        return payload;
+      }
+
+      function renderRawJsonSection(doc) {
+        const rawDoc = toRawDocumentPayload(doc);
+        const section = el("section", "raw-json-section");
+        const header = el("div", "raw-json-header");
+        const heading = document.createElement("div");
+        heading.appendChild(el("div", "raw-json-title", "Original JSON"));
+        heading.appendChild(
+          el(
+            "div",
+            "raw-json-subtitle",
+            "Mirrors the stored memory file structure for schema checks and field-level debugging.",
+          ),
+        );
+        header.appendChild(heading);
+        header.appendChild(
+          el(
+            "span",
+            "raw-json-chip",
+            `${formatNumber(Object.keys(rawDoc).length)} top-level keys`,
+          ),
+        );
+        section.appendChild(header);
+
+        const tree = el("div", "json-tree");
+        tree.appendChild(
+          createJsonNode("root", rawDoc, 0, {
+            expanded: true,
+          }),
+        );
+        section.appendChild(tree);
+        return section;
       }
 
       function renderEmptyState(message) {
@@ -2252,6 +2598,7 @@
           shareKey: doc.shareKey || state.activeShareKey,
         });
         container.appendChild(header);
+        container.appendChild(renderRawJsonSection(doc));
 
         const memories = Array.isArray(doc.memories) ? doc.memories : [];
         for (let i = 0; i < memories.length; i++) {
@@ -2287,6 +2634,7 @@
           header.appendChild(statsRow);
         }
         container.appendChild(header);
+        container.appendChild(renderRawJsonSection(doc));
 
         const memories = Array.isArray(doc.deduped_memories)
           ? doc.deduped_memories
