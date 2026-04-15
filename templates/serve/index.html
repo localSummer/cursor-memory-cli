@@ -1562,7 +1562,17 @@
       </div>
     </div>
 
-    <script>
+    <script type="module">
+      import {
+        SHARE_QUERY_PARAM,
+        buildTreeIndexes as buildPermalinkIndexes,
+        buildShareUrl as buildPermalinkUrl,
+        getShareKeyFromHref,
+        getTreeEntryByFileId as getIndexedTreeEntryByFileId,
+        getTreeEntryByShareKey as getIndexedTreeEntryByShareKey,
+        resolveSharedEntry,
+      } from "/assets/serve-permalink.mjs";
+
       /* ============================================================
    State
    ============================================================ */
@@ -1580,7 +1590,6 @@
       };
 
       const THEME_STORAGE_KEY = "cursor-memory-theme";
-      const SHARE_QUERY_PARAM = "share";
       const THEME_ICONS = {
         light: `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -2024,80 +2033,25 @@
       }
 
       function buildTreeIndexes(projects) {
-        const byId = new Map();
-        const byShareKey = new Map();
-        const priority = {
-          session: 3,
-          "archived-session": 2,
-          aggregate: 1,
-        };
-
-        function remember(item) {
-          byId.set(item.id, item);
-          if (!item.shareKey) return;
-          const current = byShareKey.get(item.shareKey);
-          if (!current || priority[item.kind] > priority[current.kind]) {
-            byShareKey.set(item.shareKey, item);
-          }
-        }
-
-        for (const project of projects || []) {
-          for (const group of project.memories || []) {
-            for (const file of group.files || []) {
-              remember({
-                id: file.id,
-                shareKey: file.shareKey || null,
-                kind: file.kind,
-                projectId: project.projectId,
-              });
-            }
-          }
-          for (const group of project.archive || []) {
-            for (const file of group.files || []) {
-              remember({
-                id: file.id,
-                shareKey: file.shareKey || null,
-                kind: file.kind,
-                projectId: project.projectId,
-              });
-            }
-          }
-          for (const agg of project.aggregates || []) {
-            remember({
-              id: agg.id,
-              shareKey: agg.shareKey || null,
-              kind: agg.kind,
-              projectId: project.projectId,
-            });
-          }
-        }
-
+        const { byId, byShareKey } = buildPermalinkIndexes(projects);
         state.fileIndexById = byId;
         state.fileIndexByShareKey = byShareKey;
       }
 
       function getTreeEntryByFileId(fileId) {
-        return state.fileIndexById.get(Number(fileId)) || null;
+        return getIndexedTreeEntryByFileId(state.fileIndexById, fileId);
       }
 
       function getTreeEntryByShareKey(shareKey) {
-        if (!shareKey) return null;
-        return state.fileIndexByShareKey.get(shareKey) || null;
+        return getIndexedTreeEntryByShareKey(state.fileIndexByShareKey, shareKey);
       }
 
       function getShareKeyFromUrl() {
-        const url = new URL(window.location.href);
-        return url.searchParams.get(SHARE_QUERY_PARAM);
+        return getShareKeyFromHref(window.location.href, SHARE_QUERY_PARAM);
       }
 
       function buildShareUrl(shareKey) {
-        const url = new URL(window.location.href);
-        if (shareKey) {
-          url.searchParams.set(SHARE_QUERY_PARAM, shareKey);
-        } else {
-          url.searchParams.delete(SHARE_QUERY_PARAM);
-        }
-        return url.toString();
+        return buildPermalinkUrl(window.location.href, shareKey, SHARE_QUERY_PARAM);
       }
 
       function updateUrlForShareKey(shareKey, mode = "none") {
@@ -2252,8 +2206,13 @@
         source = "url-init",
         historyMode = "replace",
       } = {}) {
-        const shareKey = getShareKeyFromUrl();
-        if (!shareKey) {
+        const resolution = resolveSharedEntry({
+          href: window.location.href,
+          byShareKey: state.fileIndexByShareKey,
+          shareQueryParam: SHARE_QUERY_PARAM,
+        });
+
+        if (resolution.status === "empty") {
           invalidateActiveRequest();
           clearActiveSelection();
           renderContentNode(
@@ -2262,16 +2221,15 @@
           return;
         }
 
-        const entry = getTreeEntryByShareKey(shareKey);
-        if (!entry) {
-          renderSharedNotFoundState(shareKey);
+        if (resolution.status === "not-found") {
+          renderSharedNotFoundState(resolution.shareKey);
           return;
         }
 
-        await loadFile(entry.id, {
+        await loadFile(resolution.entry.id, {
           historyMode,
           source,
-          shareKey,
+          shareKey: resolution.shareKey,
         });
       }
 
