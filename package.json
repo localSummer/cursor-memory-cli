@@ -1,0 +1,26 @@
+{
+  "name": "cursor-memory-cli",
+  "version": "0.1.0",
+  "description": "A Node.js CLI for installing and managing Cursor Memory components.",
+  "type": "module",
+  "bin": {
+    "cursor-memory": "./index.mjs"
+  },
+  "scripts": {
+    "start": "node ./index.mjs",
+    "setup": "node ./index.mjs setup",
+    "archive": "node ./index.mjs archive",
+    "serve": "node ./index.mjs serve",
+    "search": "node ./index.mjs search",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cursor",
+    "memory",
+    "cli",
+    "hooks"
+  ]
+}
