@@ -11,6 +11,7 @@
 - [快速开始](#快速开始)
 - [安装组件说明](#安装组件说明)
 - [使用方法](#使用方法)
+- [终端搜索](#终端搜索)
 - [记忆类型](#记忆类型)
 - [存储结构](#存储结构)
 - [配置说明](#配置说明)
@@ -242,6 +243,27 @@ Skill 会自主完成记忆的分析、提取和存储到 `./memories/` 目录�
 - 希望立即提取记忆而不等待自动评估
 - 需要分析历史会话文件
 - 调试记忆提取功能
+
+### 终端搜索
+
+如果你希望不启动本地预览服务，直接在终端里查 memory，可以使用 `search` 命令：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs search refresh token
+```
+
+指定搜索根目录并限制返回数量：
+
+```bash
+node ~/.cursor/cli/cursor-memory-cli/index.mjs search "refresh token" --root ~/projects --limit 5
+```
+
+说明：
+
+- 默认以当前工作目录作为搜索根目录
+- 搜索范围覆盖 memory 的 `title` 和 `content`
+- 无命中时会输出明确提示，但不会作为错误退出
+- 第一版只提供只读关键词检索，不包含高级过滤、详情展开或写操作
 
 ### 记忆预览
 
@@ -478,13 +500,15 @@ Commands:
   setup     Install cursor-memory components
   archive   Run memory archive manually
   serve     Start memory preview server
+  search    Search stored memories from the terminal
 
 Options:
   --global    Install to ~/.cursor/ (user-level)
   --local     Install to ./.cursor/ (project-level)
   --dry-run   Preview archive without moving files (archive command)
   --threshold <days>  Override retention days (archive command)
-  --limit <n>  Override max files per run (archive command)
+  --limit <n>  Override result limit (archive/search commands)
+  --root <path>  Search root directory (search command)
   --port <n>  Server port (default: 3000, serve command only)
   --help      Show help message
 ```
