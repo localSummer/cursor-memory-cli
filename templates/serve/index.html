@@ -776,6 +776,7 @@
       }
 
       .raw-json-section {
+        margin-top: 28px;
         margin-bottom: 18px;
         padding: 18px 20px;
         border: 1px solid var(--border);
@@ -1028,6 +1029,43 @@
         color: var(--text-primary);
       }
 
+      .card-section + .card-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line-soft);
+      }
+
+      .card-section-header {
+        margin-bottom: 10px;
+      }
+
+      .card-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .card-section-subtitle {
+        margin-top: 4px;
+        color: var(--text-soft);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .card-conclusion-picked {
+        margin-bottom: 12px;
+        padding: 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        background: var(--accent-contrast);
+      }
+
+      .card-conclusion-picked .card-detail-label {
+        color: var(--accent-strong);
+      }
+
       .card-content {
         margin-bottom: 14px;
         font-size: 14px;
@@ -1046,6 +1084,18 @@
         color: var(--text-secondary);
         font-size: 13px;
         font-style: normal;
+      }
+
+      .card-section .card-content:last-child,
+      .card-section .card-reasoning:last-child,
+      .card-section .card-tag-group:last-child,
+      .card-section .confidence-row:last-child,
+      .card-section .card-decision-alternatives:last-child,
+      .card-section .card-urls:last-child,
+      .card-section .source-chunk:last-child,
+      .card-section .source-toggle:last-child,
+      .card-section .card-conclusion-picked:last-child {
+        margin-bottom: 0;
       }
 
       .card-detail {
@@ -1134,6 +1184,10 @@
       .card-urls {
         margin-bottom: 12px;
         font-size: 12px;
+      }
+
+      .card-urls .card-detail-label {
+        margin-bottom: 8px;
       }
 
       .card-urls a {
@@ -1572,6 +1626,10 @@
         getTreeEntryByShareKey as getIndexedTreeEntryByShareKey,
         resolveSharedEntry,
       } from "/assets/serve-permalink.mjs";
+      import {
+        buildMemorySections,
+        getDocumentSectionOrder,
+      } from "/assets/serve-content-hierarchy.mjs";
 
       /* ============================================================
    State
@@ -1880,99 +1938,182 @@
         return group;
       }
 
-      function renderDecisionSummary(mem) {
-        const selected =
-          mem.selected_option === undefined ||
-          mem.selected_option === null ||
-          mem.selected_option === ""
-            ? ""
-            : String(mem.selected_option);
-        const reasoning =
-          mem.reasoning === undefined ||
-          mem.reasoning === null ||
-          mem.reasoning === ""
-            ? ""
-            : String(mem.reasoning);
-        const alternatives = Array.isArray(mem.alternatives)
-          ? mem.alternatives.filter((alt) => alt && (alt.option || alt.why_not))
-          : [];
+      function renderMemorySectionHeader(title, subtitle) {
+        const header = el("div", "card-section-header");
+        header.appendChild(el("div", "card-section-title", title));
+        if (subtitle) {
+          header.appendChild(el("div", "card-section-subtitle", subtitle));
+        }
+        return header;
+      }
 
-        if (!selected && !reasoning && alternatives.length === 0) return null;
+      function renderDecisionChoice(selectedOption) {
+        if (!selectedOption) return null;
+        const block = el("div", "card-conclusion-picked");
+        block.appendChild(el("div", "card-detail-label", "Chosen option"));
+        block.appendChild(
+          el("div", "card-decision-picked-value", selectedOption),
+        );
+        return block;
+      }
 
-        const section = el("section", "card-decision");
-        const header = el("div", "card-decision-header");
-        header.appendChild(
-          el("div", "card-decision-title", "Decision snapshot"),
+      function renderConfidenceRow(score) {
+        if (typeof score !== "number") return null;
+        const row = el("div", "confidence-row");
+        const label = document.createElement("strong");
+        txt(label, "Confidence");
+        row.appendChild(label);
+        const barBg = el("div", "confidence-bar-bg");
+        const barFill = el("div", "confidence-bar-fill");
+        const confColor =
+          score < 60
+            ? "var(--conf-low)"
+            : score < 80
+              ? "var(--conf-mid)"
+              : "var(--conf-high)";
+        barFill.style.background = confColor;
+        requestAnimationFrame(() => {
+          barFill.style.width = `${score}%`;
+        });
+        barBg.appendChild(barFill);
+        row.appendChild(barBg);
+        txt(row, `${formatNumber(score)}%`);
+        return row;
+      }
+
+      function renderAlternativesSection(alternatives) {
+        if (!Array.isArray(alternatives) || alternatives.length === 0) {
+          return null;
+        }
+
+        const altSection = el("div", "card-decision-alternatives");
+        altSection.appendChild(
+          el("div", "card-decision-section-title", "Alternatives considered"),
+        );
+        altSection.appendChild(
+          el(
+            "p",
+            "card-decision-caption",
+            "Options evaluated but not adopted.",
+          ),
         );
 
-        let caption = "This captures the final choice for the decision.";
-        if (selected && reasoning && alternatives.length > 0) {
-          caption =
-            "Chosen option first, then the reasoning and alternatives that were considered but not selected.";
-        } else if (alternatives.length > 0) {
-          caption =
-            "These are the options that were considered, with the final choice shown first when available.";
-        } else if (reasoning) {
-          caption =
-            "This captures the final choice and the reasoning behind it.";
-        }
-        header.appendChild(el("p", "card-decision-caption", caption));
-        section.appendChild(header);
-
-        if (selected) {
-          const picked = el("div", "card-decision-picked");
-          picked.appendChild(
-            el("div", "card-decision-section-title", "Chosen option"),
-          );
-          picked.appendChild(el("div", "card-decision-picked-value", selected));
-          section.appendChild(picked);
-        }
-
-        if (reasoning) {
-          const reason = el("div", "card-decision-reason");
-          reason.appendChild(
-            el("div", "card-decision-section-title", "Why this choice"),
-          );
-          reason.appendChild(el("div", "card-detail-value", reasoning));
-          section.appendChild(reason);
-        }
-
-        if (alternatives.length > 0) {
-          const altSection = el("div", "card-decision-alternatives");
-          altSection.appendChild(
-            el("div", "card-decision-section-title", "Alternatives considered"),
-          );
-          altSection.appendChild(
-            el(
-              "p",
-              "card-decision-caption",
-              "Options evaluated but not adopted.",
-            ),
+        const list = el("div", "card-decision-list");
+        for (const alt of alternatives) {
+          const item = el("article", "decision-alt-item");
+          item.appendChild(
+            el("div", "decision-alt-name", alt.option || "Alternative"),
           );
 
-          const list = el("div", "card-decision-list");
-          for (const alt of alternatives) {
-            const item = el("article", "decision-alt-item");
-            item.appendChild(
-              el("div", "decision-alt-name", alt.option || "Alternative"),
+          if (alt.whyNot) {
+            const why = el("div", "decision-alt-why");
+            why.appendChild(
+              el("div", "decision-alt-label", "Not selected because"),
             );
-
-            if (alt.why_not) {
-              const why = el("div", "decision-alt-why");
-              why.appendChild(
-                el("div", "decision-alt-label", "Not selected because"),
-              );
-              why.appendChild(
-                el("div", "decision-alt-reason", String(alt.why_not)),
-              );
-              item.appendChild(why);
-            }
-
-            list.appendChild(item);
+            why.appendChild(el("div", "decision-alt-reason", alt.whyNot));
+            item.appendChild(why);
           }
 
-          altSection.appendChild(list);
-          section.appendChild(altSection);
+          list.appendChild(item);
+        }
+
+        altSection.appendChild(list);
+        return altSection;
+      }
+
+      function renderUrlList(urls) {
+        if (!Array.isArray(urls) || urls.length === 0) return null;
+        const urlDiv = el("div", "card-urls");
+        urlDiv.appendChild(el("div", "card-detail-label", "Links"));
+        for (const u of urls) {
+          if (/^https?:\/\//i.test(u)) {
+            const a = document.createElement("a");
+            a.href = u;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            txt(a, u);
+            urlDiv.appendChild(a);
+            urlDiv.appendChild(document.createElement("br"));
+          } else {
+            urlDiv.appendChild(el("span", "", u));
+            urlDiv.appendChild(document.createElement("br"));
+          }
+        }
+        return urlDiv;
+      }
+
+      function renderSupportingSection(supporting) {
+        if (!supporting?.hasContent) return null;
+        const section = el("section", "card-section card-section-supporting");
+        section.appendChild(
+          renderMemorySectionHeader(
+            "Supporting context",
+            "Why this memory matters and what shapes the conclusion.",
+          ),
+        );
+
+        if (supporting.reasoning) {
+          section.appendChild(el("div", "card-reasoning", supporting.reasoning));
+        }
+
+        const confidenceRow = renderConfidenceRow(supporting.confidenceScore);
+        if (confidenceRow) section.appendChild(confidenceRow);
+
+        const alternativesSection = renderAlternativesSection(
+          supporting.alternatives,
+        );
+        if (alternativesSection) section.appendChild(alternativesSection);
+
+        const entityTags = renderTagGroup(
+          "Related entities",
+          supporting.relatedEntities,
+        );
+        if (entityTags) section.appendChild(entityTags);
+
+        const toolsTags = renderTagGroup("Tools", supporting.toolsMentioned);
+        if (toolsTags) section.appendChild(toolsTags);
+
+        const agentTags = renderTagGroup(
+          "Target agents",
+          supporting.targetAgents,
+        );
+        if (agentTags) section.appendChild(agentTags);
+
+        return section;
+      }
+
+      function renderEvidenceSection(evidence) {
+        if (!evidence?.hasContent) return null;
+        const section = el("section", "card-section card-section-evidence");
+        section.appendChild(
+          renderMemorySectionHeader(
+            "Evidence",
+            "Source material and raw references behind this memory.",
+          ),
+        );
+
+        const urls = renderUrlList(evidence.urlsMentioned);
+        if (urls) section.appendChild(urls);
+
+        if (evidence.sourceChunk) {
+          const toggle = el("button", "source-toggle");
+          toggle.type = "button";
+          setExpandedState(toggle, false);
+          const toggleArrow = el("span", "tree-arrow", "\u25B6");
+          toggle.appendChild(toggleArrow);
+          txt(toggle, " Source conversation");
+          section.appendChild(toggle);
+
+          const chunkDiv = el("div", "source-chunk");
+          renderSourceChunk(chunkDiv, evidence.sourceChunk);
+          section.appendChild(chunkDiv);
+
+          toggle.addEventListener("click", () => {
+            const isOpen = !chunkDiv.classList.contains("open");
+            toggleArrow.classList.toggle("open", isOpen);
+            chunkDiv.classList.toggle("open", isOpen);
+            setExpandedState(toggle, isOpen);
+          });
         }
 
         return section;
@@ -2542,6 +2683,31 @@
         }
       }
 
+      function appendMemoryCards(container, memories) {
+        for (let i = 0; i < memories.length; i++) {
+          const card = renderMemoryCard(memories[i], i);
+          card.style.animationDelay = `${i * 0.05}s`;
+          card.id = `memory-${i}`;
+          container.appendChild(card);
+        }
+      }
+
+      function renderDocumentSections(container, doc, memories) {
+        for (const sectionName of getDocumentSectionOrder(doc)) {
+          if (sectionName === "memories") {
+            appendMemoryCards(container, memories);
+            continue;
+          }
+          if (sectionName === "suggestions") {
+            renderSuggestions(container, doc.suggestions);
+            continue;
+          }
+          if (sectionName === "raw-json") {
+            container.appendChild(renderRawJsonSection(doc));
+          }
+        }
+      }
+
       function renderSession(container, doc) {
         const header = createDocumentHeader({
           className: "session-header",
@@ -2556,17 +2722,9 @@
           shareKey: doc.shareKey || state.activeShareKey,
         });
         container.appendChild(header);
-        container.appendChild(renderRawJsonSection(doc));
 
         const memories = Array.isArray(doc.memories) ? doc.memories : [];
-        for (let i = 0; i < memories.length; i++) {
-          const card = renderMemoryCard(memories[i], i);
-          card.style.animationDelay = `${i * 0.05}s`;
-          card.id = `memory-${i}`;
-          container.appendChild(card);
-        }
-
-        renderSuggestions(container, doc.suggestions);
+        renderDocumentSections(container, doc, memories);
       }
 
       function renderAggregate(container, doc) {
@@ -2592,16 +2750,11 @@
           header.appendChild(statsRow);
         }
         container.appendChild(header);
-        container.appendChild(renderRawJsonSection(doc));
 
         const memories = Array.isArray(doc.deduped_memories)
           ? doc.deduped_memories
           : [];
-        for (let i = 0; i < memories.length; i++) {
-          const card = renderMemoryCard(memories[i], i);
-          card.style.animationDelay = `${i * 0.05}s`;
-          container.appendChild(card);
-        }
+        renderDocumentSections(container, doc, memories);
       }
 
       /* ============================================================
@@ -2621,129 +2774,55 @@
       };
 
       function renderMemoryCard(mem, index) {
+        const sections = buildMemorySections(mem, { index });
         const card = el("div", "memory-card");
 
         const top = el("div", "card-top");
         const badge = el(
           "span",
           "type-badge",
-          (mem.type || "unknown").replace(/_/g, " "),
+          sections.header.typeLabel,
         );
-        const color = TYPE_COLORS[mem.type] || "var(--text-muted)";
+        const color = TYPE_COLORS[sections.header.type] || "var(--text-muted)";
         badge.style.background = color;
         badge.style.color = "#fff";
         top.appendChild(badge);
-        if (mem.category) {
-          top.appendChild(el("span", "category-badge", mem.category));
+        if (sections.header.category) {
+          top.appendChild(
+            el("span", "category-badge", sections.header.category),
+          );
         }
-        top.appendChild(
-          el("span", "card-title", mem.title || `Memory ${index + 1}`),
-        );
+        top.appendChild(el("span", "card-title", sections.header.title));
         card.appendChild(top);
 
-        if (mem.content) {
-          card.appendChild(el("div", "card-content", mem.content));
-        }
-
-        if (mem.type === "decision") {
-          const decisionSummary = renderDecisionSummary(mem);
-          if (decisionSummary) {
-            card.appendChild(decisionSummary);
-          }
-        } else if (mem.reasoning) {
-          card.appendChild(el("div", "card-reasoning", mem.reasoning));
-        }
-
-        if (typeof mem.confidence_score === "number") {
-          const row = el("div", "confidence-row");
-          const label = document.createElement("strong");
-          txt(label, "Confidence");
-          row.appendChild(label);
-          const barBg = el("div", "confidence-bar-bg");
-          const barFill = el("div", "confidence-bar-fill");
-          const score = mem.confidence_score;
-          const confColor =
-            score < 60
-              ? "var(--conf-low)"
-              : score < 80
-                ? "var(--conf-mid)"
-                : "var(--conf-high)";
-          barFill.style.background = confColor;
-          requestAnimationFrame(() => {
-            barFill.style.width = `${score}%`;
-          });
-          barBg.appendChild(barFill);
-          row.appendChild(barBg);
-          txt(row, `${formatNumber(score)}%`);
-          card.appendChild(row);
-        }
-
-        if (
-          Array.isArray(mem.related_entities) &&
-          mem.related_entities.length > 0
-        ) {
-          const entities = mem.related_entities.map(
-            (ent) => `${ent.type}: ${ent.raw || ent.slug || ""}`,
+        if (sections.conclusion.hasPrimaryContent) {
+          const conclusion = el("section", "card-section card-section-conclusion");
+          conclusion.appendChild(
+            renderMemorySectionHeader(
+              "Conclusion",
+              "Read this first to understand the retained takeaway.",
+            ),
           );
-          const tags = renderTagGroup("Related entities", entities);
-          if (tags) card.appendChild(tags);
-        }
 
-        if (
-          Array.isArray(mem.tools_mentioned) &&
-          mem.tools_mentioned.length > 0
-        ) {
-          const tags = renderTagGroup("Tools", mem.tools_mentioned);
-          if (tags) card.appendChild(tags);
-        }
+          const decisionChoice = renderDecisionChoice(
+            sections.conclusion.selectedOption,
+          );
+          if (decisionChoice) conclusion.appendChild(decisionChoice);
 
-        if (Array.isArray(mem.target_agents) && mem.target_agents.length > 0) {
-          const tags = renderTagGroup("Target agents", mem.target_agents);
-          if (tags) card.appendChild(tags);
-        }
-
-        if (
-          Array.isArray(mem.urls_mentioned) &&
-          mem.urls_mentioned.length > 0
-        ) {
-          const urlDiv = el("div", "card-urls");
-          for (const u of mem.urls_mentioned) {
-            if (/^https?:\/\//i.test(u)) {
-              const a = document.createElement("a");
-              a.href = u;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              txt(a, u);
-              urlDiv.appendChild(a);
-              urlDiv.appendChild(document.createElement("br"));
-            } else {
-              urlDiv.appendChild(el("span", "", u));
-              urlDiv.appendChild(document.createElement("br"));
-            }
+          if (sections.conclusion.content) {
+            conclusion.appendChild(
+              el("div", "card-content", sections.conclusion.content),
+            );
           }
-          card.appendChild(urlDiv);
+
+          card.appendChild(conclusion);
         }
 
-        if (mem.source_chunk) {
-          const toggle = el("button", "source-toggle");
-          toggle.type = "button";
-          setExpandedState(toggle, false);
-          const toggleArrow = el("span", "tree-arrow", "\u25B6");
-          toggle.appendChild(toggleArrow);
-          txt(toggle, " Source conversation");
-          card.appendChild(toggle);
+        const supporting = renderSupportingSection(sections.supporting);
+        if (supporting) card.appendChild(supporting);
 
-          const chunkDiv = el("div", "source-chunk");
-          renderSourceChunk(chunkDiv, mem.source_chunk);
-          card.appendChild(chunkDiv);
-
-          toggle.addEventListener("click", () => {
-            const isOpen = !chunkDiv.classList.contains("open");
-            toggleArrow.classList.toggle("open", isOpen);
-            chunkDiv.classList.toggle("open", isOpen);
-            setExpandedState(toggle, isOpen);
-          });
-        }
+        const evidence = renderEvidenceSection(sections.evidence);
+        if (evidence) card.appendChild(evidence);
 
         return card;
       }
