@@ -35,6 +35,7 @@ Cursor Memory 系统通过以下机制工作：
 ### 核心特性
 
 - **自动触发**：通过 Cursor hooks 机制自动触发记忆评估
+- **写前召回**：在支持的 Cursor IDE hooks 路径中，可在提交 prompt 前注入少量相关历史记忆作为轻量提示
 - **智能去重**：同一会话的多次提取会自动合并到同一文件
 - **质量过滤**：仅保留置信度 >= 50 的高价值记忆
 - **结构化存储**：按日期组织的 JSON 文件，便于检索
@@ -102,6 +103,7 @@ node ~/.cursor/cli/cursor-memory-cli/index.mjs setup --global
        Components installed:
          - hooks.json (merged)
          - hooks/cursor-memory-reminder.sh (executable)
+         - hooks/cursor-memory-recall.mjs
          - hooks/cursor-memory-archive.sh (executable)
          - hooks/cursor-memory-archive.mjs
          - memory-archive.json
@@ -116,6 +118,8 @@ node ~/.cursor/cli/cursor-memory-cli/index.mjs setup --global
 ### 3. 开始使用
 
 现在每次与 Cursor Agent 交互时，系统会自动评估是否需要提取记忆。cursor-memory skill 会自主完成记忆的分析、提取和存储。
+
+在支持的 Cursor IDE hooks 环境中，`beforeSubmitPrompt` 还会尝试基于当前项目和当前 prompt 做一次轻量 recall，把少量相关历史记忆作为“可忽略的提示”附加到本次提交上下文中。
 
 如果需要手动触发记忆提取，可以使用命令：
 
@@ -157,9 +161,25 @@ CLI 会安装以下组件：
 
 - 在每次交互前注入记忆评估提醒规则
 - 创建临时规则文件 `rules/cursor-memory-reminder.mdc`
+- 调用 recall runtime，尝试通过 `beforeSubmitPrompt` 的 prompt modification 能力附加轻量历史记忆提示
 - 提示 Agent 评估当前会话是否产生了值得保留的记忆
 
-### 3. cursor-memory-archive.sh / cursor-memory-archive.mjs
+### 3. cursor-memory-recall.mjs
+
+位于 `hooks/` 目录的 recall runtime，负责：
+
+- 解析 Cursor hook 传入的 `prompt` 和 `workspace_roots`
+- 在当前项目范围内搜索高相关 memory 候选
+- 生成 prompt modification 响应，把 recall 内容附加到本次 prompt
+- 在字段缺失、无命中或运行异常时优雅降级为放行，不阻塞提交
+
+**注意**：
+
+- 第一版优先面向 Cursor IDE 主路径，不承诺 CLI hooks 完全等价
+- recall 是 best-effort 轻量提示，不保证每次出现
+- recall 不会自动阻断提交，也不会自动写回 prompt 文件
+
+### 4. cursor-memory-archive.sh / cursor-memory-archive.mjs
 
 位于 `hooks/` 目录的归档脚本与执行器，负责：
 
@@ -168,7 +188,7 @@ CLI 会安装以下组件：
 - 按月生成聚合文件 `./memories/archive/aggregate/YYYY-MM.json`
 - 跨会话相似度去重（Jaccard > 0.85）
 
-### 4. cursor-memory skill
+### 5. cursor-memory skill
 
 位于 `skills/cursor-memory/` 目录，包含：
 
@@ -176,7 +196,7 @@ CLI 会安装以下组件：
 - `references/TYPES.md`：10 种记忆类型和 12 种实体类型的定义
 - `references/STORAGE.md`：存储格式和去重逻辑说明
 
-### 5. memory-archive.json
+### 6. memory-archive.json
 
 归档配置文件，默认内容如下：
 
@@ -202,7 +222,7 @@ CLI 会安装以下组件：
 }
 ```
 
-### 6. catch-memory 命令（手动补充）
+### 7. catch-memory 命令（手动补充）
 
 位于 `commands/catch-memory.md`，作为手动触发记忆提取的补充工具。
 
